@@ -14,6 +14,8 @@ from typing import List, Optional
 import logging
 import json
 from .auth import get_current_user, create_access_token, verify_password
+import re
+from fastapi.responses import JSONResponse
 
 # Создаем таблицы в базе данных
 models.Base.metadata.create_all(bind=engine)
@@ -43,12 +45,27 @@ app = FastAPI(
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:80", "http://localhost"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*", "Authorization", "Content-Type", "Accept"],
+    expose_headers=["*"],
+    max_age=3600
 )
+
+# Добавляем обработчик для OPTIONS запросов
+@app.options("/{full_path:path}")
+async def options_handler():
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 # Настройка логирования
 logging.basicConfig(
@@ -184,15 +201,65 @@ async def root():
 
 @app.get("/api/columns")
 async def get_columns(db: Session = Depends(get_db)):
-    columns = db.query(models.KanbanColumn).all()
-    # Загружаем карточки для каждой колонки
-    for column in columns:
-        column.cards = db.query(models.Card).filter(models.Card.column_id == column.id).all()
-        # Загружаем информацию об исполнителях для каждой карточки
-        for card in column.cards:
-            if card.assignee_id:
-                card.assignee = db.query(models.User).filter(models.User.id == card.assignee_id).first()
-    return columns
+    try:
+        columns = db.query(models.KanbanColumn).all()
+        # Загружаем карточки для каждой колонки
+        for column in columns:
+            column.cards = db.query(models.Card).filter(models.Card.column_id == column.id).all()
+            # Загружаем информацию об исполнителях и тегах для каждой карточки
+            for card in column.cards:
+                if card.assignee_id:
+                    card.assignee = db.query(models.User).filter(models.User.id == card.assignee_id).first()
+                # Загружаем теги
+                card.tags = db.query(models.Tag).join(models.CardTag).filter(models.CardTag.card_id == card.id).all()
+                logger.info(f"Card {card.id} tags: {[tag.name for tag in card.tags]}")
+                logger.info(f"Card {card.id} tags (full data): {[tag.__dict__ for tag in card.tags]}")
+                logger.info(f"Card {card.id} tags (type): {type(card.tags)}")
+                logger.info(f"Card {card.id} full data: {card.__dict__}")
+        
+        # Формируем ответ
+        response_data = []
+        for column in columns:
+            column_data = {
+                "id": column.id,
+                "title": column.title,
+                "position": column.position,
+                "color": column.color,
+                "cards": []
+            }
+            
+            for card in column.cards:
+                card_data = {
+                    "id": card.id,
+                    "title": card.title,
+                    "description": card.description,
+                    "position": card.position,
+                    "story_points": card.story_points,
+                    "column_id": card.column_id,
+                    "assignee_id": card.assignee_id,
+                    "created_at": card.created_at,
+                    "updated_at": card.updated_at,
+                    "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
+                }
+                
+                if card.assignee:
+                    card_data["assignee"] = {
+                        "id": card.assignee.id,
+                        "username": card.assignee.username,
+                        "is_active": card.assignee.is_active,
+                        "created_at": card.assignee.created_at
+                    }
+                
+                column_data["cards"].append(card_data)
+            
+            response_data.append(column_data)
+        
+        logger.info(f"Отправляем ответ с колонками: {response_data}")
+        return response_data
+    except Exception as e:
+        logger.error(f"Ошибка при получении колонок: {str(e)}")
+        logger.error("Полный стек ошибки:", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/columns/{column_id}")
 async def get_column(column_id: int, db: Session = Depends(get_db)):
@@ -200,6 +267,77 @@ async def get_column(column_id: int, db: Session = Depends(get_db)):
     if not column:
         raise HTTPException(status_code=404, detail="Колонка не найдена")
     return column
+
+def get_or_create_tag(db: Session, tag_name: str) -> models.Tag:
+    try:
+        logger.info(f"Создание или получение тега: {tag_name}")
+        logger.info(f"Тип тега: {type(tag_name)}")
+        
+        # Убираем все # в начале и добавляем один #
+        tag_name = tag_name.lstrip('#')
+        tag_name = f'#{tag_name}'
+        
+        # Проверяем длину тега
+        if len(tag_name) > 50:
+            raise ValueError(f"Тег слишком длинный: {tag_name}")
+        
+        tag = db.query(models.Tag).filter(models.Tag.name == tag_name).first()
+        if not tag:
+            logger.info(f"Создаем новый тег: {tag_name}")
+            tag = models.Tag(name=tag_name)
+            db.add(tag)
+            try:
+                db.commit()
+                db.refresh(tag)
+                logger.info(f"Тег успешно создан: {tag.name}, id: {tag.id}")
+            except Exception as e:
+                logger.error(f"Ошибка при создании тега: {str(e)}")
+                db.rollback()
+                raise
+        else:
+            logger.info(f"Найден существующий тег: {tag.name}, id: {tag.id}")
+        
+        return tag
+    except Exception as e:
+        logger.error(f"Ошибка в get_or_create_tag: {str(e)}")
+        logger.error("Полный стек ошибки:", exc_info=True)
+        raise
+
+def update_card_tags(db: Session, card: models.Card, tag_names: List[str]):
+    try:
+        logger.info(f"Обновление тегов карточки {card.id}: {tag_names}")
+        logger.info(f"Тип тегов: {type(tag_names)}")
+        logger.info(f"Структура тегов: {[type(tag) for tag in tag_names]}")
+        
+        if tag_names is None:
+            logger.info("Теги не указаны, пропускаем обновление")
+            return
+        
+        if len(tag_names) > 5:
+            raise ValueError("Максимальное количество тегов - 5")
+        
+        # Удаляем все существующие теги
+        card.tags = []
+        logger.info("Существующие теги очищены")
+        
+        # Добавляем новые теги
+        for tag_name in tag_names:
+            logger.info(f"Обработка тега: {tag_name}, тип: {type(tag_name)}")
+            tag = get_or_create_tag(db, tag_name)
+            card.tags.append(tag)
+            logger.info(f"Тег добавлен: {tag.name}, id: {tag.id}")
+        
+        try:
+            db.commit()
+            logger.info(f"Теги обновлены: {[tag.name for tag in card.tags]}")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении тегов: {str(e)}")
+            db.rollback()
+            raise
+    except Exception as e:
+        logger.error(f"Ошибка в update_card_tags: {str(e)}")
+        logger.error("Полный стек ошибки:", exc_info=True)
+        raise
 
 @app.post("/api/cards", response_model=schemas.Card)
 async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -235,6 +373,14 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
         db.commit()
         db.refresh(db_card)
         
+        # Добавляем теги
+        if card.tags:
+            logger.info(f"Добавляем теги к карточке {db_card.id}: {card.tags}")
+            logger.info(f"Тип тегов: {type(card.tags)}")
+            update_card_tags(db, db_card, card.tags)
+            logger.info(f"Теги добавлены: {[tag.name for tag in db_card.tags]}")
+            logger.info(f"Тип добавленных тегов: {type(db_card.tags)}")
+        
         # Создаем запись в истории
         history_entry = models.CardHistory(
             card_id=db_card.id,
@@ -245,7 +391,8 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "position": card.position,
                 "story_points": card.story_points,
                 "column_id": card.column_id,
-                "assignee_id": card.assignee_id
+                "assignee_id": card.assignee_id,
+                "tags": card.tags
             })
         )
         db.add(history_entry)
@@ -261,7 +408,8 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
             "created_at": db_card.created_at,
-            "updated_at": db_card.updated_at
+            "updated_at": db_card.updated_at,
+            "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
         }
         
         if assignee:
@@ -429,6 +577,9 @@ async def update_card(
     current_user: models.User = Depends(get_current_user)
 ):
     try:
+        logger.info(f"Начало обновления карточки {card_id}")
+        logger.info(f"Полученные данные: {card_update.dict()}")
+        
         # Получаем карточку
         db_card = db.query(models.Card).filter(models.Card.id == card_id).first()
         if not db_card:
@@ -443,8 +594,35 @@ async def update_card(
 
         # Обновляем поля карточки
         update_data = card_update.dict(exclude_unset=True)
+        logger.info(f"Данные для обновления: {update_data}")
+        
         for key, value in update_data.items():
-            setattr(db_card, key, value)
+            if key != 'tags':  # Исключаем теги из общего обновления
+                setattr(db_card, key, value)
+
+        # Обновляем теги
+        if 'tags' in update_data:
+            logger.info(f"Обновляем теги карточки {card_id}: {update_data['tags']}")
+            logger.info(f"Тип тегов: {type(update_data['tags'])}")
+            logger.info(f"Структура тегов: {[type(tag) for tag in update_data['tags']]}")
+            
+            try:
+                # Очищаем существующие теги
+                db_card.tags = []
+                logger.info("Существующие теги очищены")
+                
+                # Добавляем новые теги
+                for tag_name in update_data['tags']:
+                    logger.info(f"Обрабатываем тег: {tag_name}, тип: {type(tag_name)}")
+                    tag_obj = get_or_create_tag(db, tag_name)
+                    logger.info(f"Создан/получен тег: {tag_obj.name}, id: {tag_obj.id}")
+                    db_card.tags.append(tag_obj)
+                
+                logger.info(f"Теги обновлены: {[tag.name for tag in db_card.tags]}")
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении тегов: {str(e)}")
+                logger.error("Полный стек ошибки:", exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Ошибка при обновлении тегов: {str(e)}")
 
         # Создаем запись в истории
         history_entry = models.CardHistory(
@@ -454,8 +632,15 @@ async def update_card(
         )
         db.add(history_entry)
         
-        db.commit()
-        db.refresh(db_card)
+        try:
+            db.commit()
+            db.refresh(db_card)
+            logger.info("Изменения успешно сохранены в базу данных")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении в базу данных: {str(e)}")
+            logger.error("Полный стек ошибки:", exc_info=True)
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Ошибка при сохранении в базу данных: {str(e)}")
 
         # Формируем ответ
         response_data = {
@@ -467,7 +652,8 @@ async def update_card(
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
             "created_at": db_card.created_at,
-            "updated_at": db_card.updated_at
+            "updated_at": db_card.updated_at,
+            "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
         }
 
         if assignee:
@@ -478,34 +664,42 @@ async def update_card(
                 "created_at": assignee.created_at
             }
 
+        logger.info(f"Успешно обновлена карточка {card_id}")
         return response_data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Неожиданная ошибка при обновлении тикета: {str(e)}")
         logger.error("Полный стек ошибки:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/tickets/{ticket_id}/comments", response_model=List[schemas.Comment])
-def get_ticket_comments(
-    ticket_id: int,
+@app.get("/api/cards/{card_id}/comments", response_model=List[schemas.Comment])
+def get_card_comments(
+    card_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    comments = db.query(models.Comment).filter(models.Comment.ticket_id == ticket_id).all()
+    comments = db.query(models.Comment).filter(models.Comment.ticket_id == card_id).all()
     # Загружаем данные о пользователях для каждого комментария
     for comment in comments:
         comment.user = db.query(models.User).filter(models.User.id == comment.user_id).first()
     return comments
 
-@app.post("/tickets/{ticket_id}/comments", response_model=schemas.Comment)
-def create_comment(
-    ticket_id: int,
+@app.post("/api/cards/{card_id}/comments", response_model=schemas.Comment)
+def create_card_comment(
+    card_id: int,
     comment: schemas.CommentCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Проверяем существование карточки
+    card = db.query(models.Card).filter(models.Card.id == card_id).first()
+    if not card:
+        raise HTTPException(status_code=404, detail="Карточка не найдена")
+    
     db_comment = models.Comment(
         content=comment.content,
-        ticket_id=ticket_id,
+        ticket_id=card_id,
         user_id=current_user.id
     )
     db.add(db_comment)
@@ -513,4 +707,106 @@ def create_comment(
     db.refresh(db_comment)
     # Загружаем данные о пользователе для нового комментария
     db_comment.user = current_user
-    return db_comment 
+    return db_comment
+
+@app.get("/api/cards/{card_id}")
+async def get_card(card_id: int, db: Session = Depends(get_db)):
+    try:
+        card = db.query(models.Card).filter(models.Card.id == card_id).first()
+        if not card:
+            raise HTTPException(status_code=404, detail="Карточка не найдена")
+        
+        # Загружаем теги
+        card.tags = db.query(models.Tag).join(models.CardTag).filter(models.CardTag.card_id == card.id).all()
+        logger.info(f"Получены теги карточки {card_id}: {[tag.name for tag in card.tags]}")
+        logger.info(f"Получены теги карточки {card_id} (полные данные): {[tag.__dict__ for tag in card.tags]}")
+        logger.info(f"Получены теги карточки {card_id} (тип): {type(card.tags)}")
+        
+        # Формируем ответ
+        response_data = {
+            "id": card.id,
+            "title": card.title,
+            "description": card.description,
+            "position": card.position,
+            "story_points": card.story_points,
+            "column_id": card.column_id,
+            "assignee_id": card.assignee_id,
+            "created_at": card.created_at,
+            "updated_at": card.updated_at,
+            "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
+        }
+        
+        if card.assignee:
+            response_data["assignee"] = {
+                "id": card.assignee.id,
+                "username": card.assignee.username,
+                "is_active": card.assignee.is_active,
+                "created_at": card.assignee.created_at
+            }
+        
+        logger.info(f"Отправляем ответ для карточки {card_id}: {response_data}")
+        return response_data
+    except Exception as e:
+        logger.error(f"Ошибка при получении карточки {card_id}: {str(e)}")
+        logger.error("Полный стек ошибки:", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/cards/{card_id}")
+async def delete_card(
+    card_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        logger.info(f"Начало удаления карточки {card_id} пользователем {current_user.username}")
+        
+        # Получаем карточку
+        db_card = db.query(models.Card).filter(models.Card.id == card_id).first()
+        if not db_card:
+            raise HTTPException(status_code=404, detail="Карточка не найдена")
+
+        # Сохраняем информацию о карточке для логирования
+        card_info = {
+            "title": db_card.title,
+            "description": db_card.description,
+            "deleted_by": current_user.username
+        }
+        
+        # Удаляем связи с тегами
+        db_card.tags.clear()
+        
+        # Удаляем карточку (комментарии и история удалятся автоматически благодаря cascade)
+        db.delete(db_card)
+        
+        try:
+            db.commit()
+            logger.info(f"Карточка {card_id} '{card_info['title']}' успешно удалена пользователем {current_user.username}")
+        except Exception as e:
+            logger.error(f"Ошибка при удалении карточки {card_id}: {str(e)}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Ошибка при удалении карточки: {str(e)}")
+
+        return {
+            "message": f"Карточка '{card_info['title']}' успешно удалена", 
+            "deleted_card_id": card_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Неожиданная ошибка при удалении карточки {card_id}: {str(e)}")
+        logger.error("Полный стек ошибки:", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Добавляем обработчик ошибок
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Глобальная ошибка: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    ) 

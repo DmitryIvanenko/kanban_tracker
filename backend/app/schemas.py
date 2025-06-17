@@ -66,6 +66,49 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+class TagBase(BaseModel):
+    name: str
+
+    @validator('name')
+    def validate_tag_name(cls, v):
+        if not v:
+            raise ValueError('Название тега не может быть пустым')
+        if len(v) > 50:
+            raise ValueError('Название тега не должно превышать 50 символов')
+        if not v.startswith('#'):
+            v = f'#{v}'
+        return v
+
+class TagCreate(TagBase):
+    pass
+
+    @validator('name')
+    def validate_tag_name(cls, v):
+        if not v:
+            raise ValueError('Название тега не может быть пустым')
+        if len(v) > 50:
+            raise ValueError('Название тега не должно превышать 50 символов')
+        if not v.startswith('#'):
+            v = f'#{v}'
+        return v
+
+class Tag(TagBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+    @validator('name')
+    def validate_tag_name(cls, v):
+        if not v:
+            raise ValueError('Название тега не может быть пустым')
+        if len(v) > 50:
+            raise ValueError('Название тега не должно превышать 50 символов')
+        if not v.startswith('#'):
+            v = f'#{v}'
+        return v
+
 class CardBase(BaseModel):
     title: str
     description: str
@@ -73,9 +116,48 @@ class CardBase(BaseModel):
     story_points: Optional[int] = None
     column_id: int
     assignee_id: Optional[int] = None
+    tags: Optional[List[str]] = None
+
+    @validator('tags')
+    def validate_tags(cls, v):
+        if v is None:
+            return []
+        if len(v) > 5:
+            raise ValueError('Максимальное количество тегов - 5')
+        
+        # Обрабатываем разные типы данных
+        result = []
+        for tag in v:
+            if isinstance(tag, str):
+                # Если это строка, форматируем её
+                formatted_tag = tag if tag.startswith('#') else f'#{tag}'
+                result.append(formatted_tag)
+            else:
+                # Если это объект Tag, берём его name
+                result.append(tag.name if hasattr(tag, 'name') else str(tag))
+        
+        return result
 
 class CardCreate(CardBase):
     pass
+
+    @validator('tags')
+    def validate_tags(cls, v):
+        if v is None:
+            return []
+        
+        # Обрабатываем разные типы данных
+        result = []
+        for tag in v:
+            if isinstance(tag, str):
+                # Если это строка, форматируем её
+                formatted_tag = tag if tag.startswith('#') else f'#{tag}'
+                result.append(formatted_tag)
+            else:
+                # Если это объект Tag, берём его name
+                result.append(tag.name if hasattr(tag, 'name') else str(tag))
+        
+        return result
 
 class CardUpdate(BaseModel):
     title: Optional[str] = None
@@ -84,12 +166,34 @@ class CardUpdate(BaseModel):
     story_points: Optional[int] = None
     column_id: Optional[int] = None
     assignee_id: Optional[int] = None
+    tags: Optional[List[str]] = None
+
+    @validator('tags')
+    def validate_tags(cls, v):
+        if v is None:
+            return []
+        if len(v) > 5:
+            raise ValueError('Максимальное количество тегов - 5')
+        
+        # Обрабатываем разные типы данных
+        result = []
+        for tag in v:
+            if isinstance(tag, str):
+                # Если это строка, форматируем её
+                formatted_tag = tag if tag.startswith('#') else f'#{tag}'
+                result.append(formatted_tag)
+            else:
+                # Если это объект Tag, берём его name
+                result.append(tag.name if hasattr(tag, 'name') else str(tag))
+        
+        return result
 
 class Card(CardBase):
     id: int
     created_at: datetime
     updated_at: datetime
     assignee: Optional[User] = None
+    tags: List[Tag] = []
 
     class Config:
         from_attributes = True

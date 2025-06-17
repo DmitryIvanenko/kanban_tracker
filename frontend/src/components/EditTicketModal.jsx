@@ -12,9 +12,12 @@ import {
   MenuItem,
   Box,
   Typography,
-  Tooltip
+  Chip,
+  Tooltip,
+  Divider
 } from '@mui/material';
-import { api } from '../services/api';
+import { api, updateCard, deleteCard, getUsers, getColumn } from '../services/api';
+import CommentsSection from './CommentsSection';
 
 const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [title, setTitle] = useState('');
@@ -25,19 +28,32 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [users, setUsers] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [columnTitle, setColumnTitle] = useState('');
+  const [tags, setTags] = useState([]);
+  const [currentTag, setCurrentTag] = useState('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (ticket) {
+      console.log('EditTicketModal: получен тикет:', ticket);
       setTitle(ticket.title);
       setDescription(ticket.description || '');
       setStoryPoints(ticket.story_points?.toString() || '');
       setAssigneeId(ticket.assignee_id || '');
+      console.log('EditTicketModal: теги тикета:', ticket.tags);
+      console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
+      console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
+      const tagNames = ticket.tags?.map(tag => {
+        if (typeof tag === 'string') return tag;
+        if (typeof tag === 'object' && tag.name) return tag.name.replace('#', '');
+        return '';
+      }).filter(Boolean) || [];
+      setTags(tagNames);
       
       // Получаем название колонки
       const fetchColumnTitle = async () => {
         try {
-          const response = await api.get(`/api/columns/${ticket.column_id}`);
-          setColumnTitle(response.data.title);
+          const columnData = await getColumn(ticket.column_id);
+          setColumnTitle(columnData.title);
         } catch (error) {
           console.error('Ошибка при получении информации о колонке:', error);
         }
@@ -47,16 +63,52 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   }, [ticket]);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchUsersData = async () => {
       try {
-        const response = await api.get('/api/users');
-        setUsers(response.data);
+        const usersData = await getUsers();
+        setUsers(usersData);
       } catch (error) {
         console.error('Ошибка при загрузке пользователей:', error);
       }
     };
-    fetchUsers();
+    fetchUsersData();
   }, []);
+
+  useEffect(() => {
+    const fetchColumnTitle = async () => {
+      if (ticket?.column_id) {
+        try {
+          const columnData = await getColumn(ticket.column_id);
+          setColumnTitle(columnData.title);
+        } catch (error) {
+          console.error('Ошибка при загрузке колонки:', error);
+        }
+      }
+    };
+    fetchColumnTitle();
+  }, [ticket]);
+
+  const handleTagKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const newTag = currentTag.trim();
+      if (!newTag) return;
+      
+      if (tags.length >= 5) {
+        setError('Максимальное количество тегов - 5');
+        return;
+      }
+      
+      if (!tags.includes(newTag)) {
+        setTags([...tags, newTag]);
+      }
+      setCurrentTag('');
+    }
+  };
+
+  const handleDeleteTag = (tagToDelete) => {
+    setTags(tags.filter(tag => tag !== tagToDelete));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,16 +124,31 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       return;
     }
 
+    if (tags.length > 5) {
+      setError('Максимальное количество тегов - 5');
+      return;
+    }
+
     try {
-      const response = await api.put(`/api/cards/${ticket.id}`, {
+      // Добавляем # к тегам перед отправкой
+      const formattedTags = tags.map(tag => {
+        const tagName = tag.startsWith('#') ? tag : `#${tag}`;
+        return tagName.replace(/^#+/, '#'); // Убираем лишние # в начале
+      });
+      console.log('Отправляем теги на бэкенд:', formattedTags);
+      
+      const cardData = {
         title: title.trim(),
         description: description.trim(),
         story_points: parseInt(storyPoints),
-        assignee_id: assigneeId || null
-      });
+        assignee_id: assigneeId || null,
+        tags: formattedTags
+      };
+      
+      const response = await updateCard(ticket.id, cardData);
       
       onClose();
-      onSuccess(response.data);
+      onSuccess(response);
     } catch (error) {
       console.error('Ошибка при обновлении тикета:', error.response?.data || error.message);
       setError(error.response?.data?.detail || 'Ошибка при обновлении тикета');
@@ -96,6 +163,27 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const handleClose = () => {
     setIsEditing(false);
     onClose();
+  };
+
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await deleteCard(ticket.id);
+      setIsDeleteDialogOpen(false);
+      onClose();
+      onSuccess(null); // Передаем null чтобы указать, что карточка удалена
+    } catch (error) {
+      console.error('Ошибка при удалении тикета:', error.response?.data || error.message);
+      setError(error.response?.data?.detail || 'Ошибка при удалении тикета');
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setIsDeleteDialogOpen(false);
   };
 
   const isDoneColumn = columnTitle === 'Done';
@@ -119,48 +207,68 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   );
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <form onSubmit={handleSubmit}>
-        <DialogTitle>
-          {isEditing ? 'Редактирование тикета' : 'Просмотр тикета'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      aria-labelledby="edit-ticket-dialog-title"
+      aria-describedby="edit-ticket-dialog-description"
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { minHeight: '70vh', maxHeight: '90vh' }
+      }}
+    >
+      <DialogTitle id="edit-ticket-dialog-title">
+        {isEditing ? 'Редактировать тикет' : 'Просмотр тикета'}
+      </DialogTitle>
+      
+      <DialogContent 
+        id="edit-ticket-dialog-description"
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 2,
+          pb: 0 // Убираем нижний отступ
+        }}
+      >
+        {/* Форма с основной информацией о тикете */}
+        <form onSubmit={handleSubmit}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Название"
+              fullWidth
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              fullWidth
-              disabled={!isEditing || isDoneColumn}
+              disabled={!isEditing}
+              error={!!error && !title.trim()}
+              helperText={error && !title.trim() ? error : ''}
             />
-            
             <TextField
               label="Описание"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               fullWidth
               multiline
               rows={4}
-              disabled={!isEditing || isDoneColumn}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={!isEditing}
             />
-            
             <TextField
               label="Story Points"
               type="number"
+              fullWidth
               value={storyPoints}
               onChange={(e) => setStoryPoints(e.target.value)}
-              fullWidth
-              disabled={!isEditing || isDoneColumn}
+              disabled={!isEditing}
+              error={!!error && (!storyPoints || isNaN(Number(storyPoints)))}
+              helperText={error && (!storyPoints || isNaN(Number(storyPoints))) ? error : ''}
             />
-            
             <FormControl fullWidth>
-              <InputLabel id="assignee-label">Исполнитель</InputLabel>
+              <InputLabel>Исполнитель</InputLabel>
               <Select
-                labelId="assignee-label"
-                label="Исполнитель"
                 value={assigneeId}
+                label="Исполнитель"
                 onChange={(e) => setAssigneeId(e.target.value)}
-                disabled={!isEditing || isDoneColumn}
+                disabled={!isEditing}
               >
                 <MenuItem value="">
                   <em>Не назначен</em>
@@ -172,25 +280,112 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 ))}
               </Select>
             </FormControl>
-
-            {error && (
-              <Typography color="error" variant="body2">
-                {error}
-              </Typography>
+            {isEditing && (
+              <Box>
+                <TextField
+                  label="Добавить тег"
+                  fullWidth
+                  value={currentTag}
+                  onChange={(e) => setCurrentTag(e.target.value)}
+                  onKeyPress={handleTagKeyPress}
+                  helperText="Нажмите Enter для добавления тега"
+                />
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {tags.map((tag) => (
+                    <Chip
+                      key={tag}
+                      label={tag}
+                      onDelete={() => handleDeleteTag(tag)}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
+            {!isEditing && tags && tags.length > 0 && (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Теги:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {tags.map((tag) => (
+                    <Chip
+                      key={tag}
+                      label={tag}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  ))}
+                </Box>
+              </Box>
             )}
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Закрыть</Button>
+        </form>
+        
+        {/* Разделитель */}
+        <Divider sx={{ my: 2 }} />
+        
+        {/* Секция комментариев - ВНЕ основной формы */}
+        {ticket && (
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <CommentsSection cardId={ticket.id} />
+          </Box>
+        )}
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+        {/* Кнопка удаления слева */}
+        <Button 
+          onClick={handleDeleteClick} 
+          variant="outlined" 
+          color="error"
+          sx={{ mr: 'auto' }}
+        >
+          Удалить тикет
+        </Button>
+        
+        {/* Основные кнопки справа */}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button onClick={handleClose}>
+            {isEditing ? 'Отмена' : 'Закрыть'}
+          </Button>
           {isEditing ? (
-            <Button type="submit" variant="contained" color="primary">
+            <Button onClick={handleSubmit} variant="contained" color="primary">
               Сохранить
             </Button>
           ) : (
             editButton
           )}
+        </Box>
+      </DialogActions>
+
+      {/* Диалог подтверждения удаления */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Подтверждение удаления
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="delete-dialog-description">
+            Вы точно уверены, что хотите удалить тикет "{ticket?.title}"?
+            <br />
+            <strong>Это действие нельзя отменить.</strong>
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>
+            Отмена
+          </Button>
+          <Button onClick={handleDeleteConfirm} variant="contained" color="error">
+            Удалить
+          </Button>
         </DialogActions>
-      </form>
+      </Dialog>
     </Dialog>
   );
 };

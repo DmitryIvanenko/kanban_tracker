@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, currentUser } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -41,9 +41,9 @@ const Layout = ({ children }) => {
           >
             Статистика
           </Button>
-          {currentUser && (
+          {user && (
             <Typography variant="body1" sx={{ mr: 2, color: 'inherit' }}>
-              {currentUser.username}
+              {user.username}
             </Typography>
           )}
           <Button color="inherit" onClick={handleLogout}>

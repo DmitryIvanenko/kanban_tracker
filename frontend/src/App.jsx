@@ -21,8 +21,8 @@ const theme = createTheme({
 });
 
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" />;
 };
 
 function App() {

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -43,6 +43,21 @@ class KanbanColumn(Base):
     board = relationship("Board", back_populates="columns")
     cards = relationship("Card", back_populates="column", cascade="all, delete-orphan")
 
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    cards = relationship("Card", secondary="card_tags", back_populates="tags")
+
+class CardTag(Base):
+    __tablename__ = "card_tags"
+
+    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), primary_key=True)
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
+
 class Card(Base):
     __tablename__ = "cards"
 
@@ -62,12 +77,13 @@ class Card(Base):
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_cards")
     history = relationship("CardHistory", back_populates="card", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="ticket", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary="card_tags", back_populates="cards")
 
 class CardHistory(Base):
     __tablename__ = "card_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    card_id = Column(Integer, ForeignKey("cards.id"))
+    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
     action = Column(String(50))
     details = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -24,37 +24,33 @@ const Login = () => {
     setError('');
     console.log('Начало обработки формы:', { isLogin, username, password });
     
-    try {
-      if (isLogin) {
-        console.log('Попытка входа с параметрами:', { username, password });
-        const result = await login(username, password);
-        console.log('Результат входа:', result);
-        if (result) {
-          console.log('Вход успешен, перенаправляем на главную страницу');
+    if (isLogin) {
+      console.log('Попытка входа с параметрами:', { username, password });
+      const result = await login(username, password);
+      console.log('Результат входа:', result);
+      if (result.success) {
+        console.log('Вход успешен, перенаправляем на главную страницу');
+        navigate('/');
+      } else {
+        setError(result.error || 'Ошибка при входе');
+      }
+    } else {
+      console.log('Попытка регистрации с параметрами:', { username, password });
+      const result = await register({ username, password });
+      console.log('Результат регистрации:', result);
+      if (result.success) {
+        console.log('Регистрация успешна, выполняем вход...');
+        const loginResult = await login(username, password);
+        console.log('Результат входа после регистрации:', loginResult);
+        if (loginResult.success) {
+          console.log('Вход после регистрации успешен, перенаправляем на главную страницу');
           navigate('/');
+        } else {
+          setError(loginResult.error || 'Ошибка при входе после регистрации');
         }
       } else {
-        console.log('Попытка регистрации с параметрами:', { username, password });
-        const result = await register(username, password);
-        console.log('Результат регистрации:', result);
-        if (result) {
-          console.log('Регистрация успешна, выполняем вход...');
-          const loginResult = await login(username, password);
-          console.log('Результат входа после регистрации:', loginResult);
-          if (loginResult) {
-            console.log('Вход после регистрации успешен, перенаправляем на главную страницу');
-            navigate('/');
-          }
-        }
+        setError(result.error || 'Ошибка при регистрации');
       }
-    } catch (error) {
-      console.error('Ошибка при обработке формы:', {
-        type: error.name,
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      setError(error.response?.data?.detail || 'Произошла ошибка при авторизации');
     }
   };
 

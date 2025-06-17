@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import KanbanColumn from './KanbanColumn';
 import CreateTicketModal from './CreateTicketModal';
-import { api } from '../services/api';
+import { getColumns, moveCard } from '../services/api';
 import AddIcon from '@mui/icons-material/Add';
 
 const KanbanBoard = () => {
@@ -21,28 +21,12 @@ const KanbanBoard = () => {
 
   const fetchColumns = async () => {
     try {
-      setLoading(true);
-      const response = await api.get('/api/columns');
-      console.log('=== НАЧАЛО ЗАГРУЗКИ КОЛОНОК ===');
-      console.log('fetchColumns данные:', response.data);
-      const columnsData = response.data.map(column => {
-        console.log('Колонка:', column.id, 'Карточки:', column.cards);
-        return {
-          ...column,
-          cards: column.cards || []
-        };
-      });
-      console.log('Обработанные данные колонок:', columnsData.map(c => ({
-        id: c.id,
-        title: c.title,
-        cardsCount: c.cards.length
-      })));
+      console.log('Загрузка колонок...');
+      const columnsData = await getColumns();
+      console.log('Полученные колонки:', columnsData);
       setColumns(columnsData);
-      setError('');
-      console.log('=== КОНЕЦ ЗАГРУЗКИ КОЛОНОК ===');
     } catch (error) {
       console.error('Ошибка при загрузке колонок:', error);
-      setError('Ошибка при загрузке колонок');
     } finally {
       setLoading(false);
     }
@@ -120,13 +104,15 @@ const KanbanBoard = () => {
         newPosition: destination.index
       });
       
-      const response = await api.post(`/api/cards/${cardId}/move`, {
+      const moveData = {
         from_column: parseInt(source.droppableId.replace('col_', '')),
         to_column: parseInt(destination.droppableId.replace('col_', '')),
         new_position: destination.index
-      });
+      };
       
-      console.log('Ответ сервера:', response.data);
+      const response = await moveCard(cardId, moveData);
+      
+      console.log('Ответ сервера:', response);
       console.log('Позиция карточки успешно обновлена');
       
       // Обновляем колонки после успешного перемещения
@@ -139,41 +125,16 @@ const KanbanBoard = () => {
     console.log('=== КОНЕЦ ПЕРЕТАСКИВАНИЯ ===');
   };
 
-  const handleCreateTicket = async (ticketData) => {
-    try {
-      const firstColumnId = columns[0].id;
-      if (!firstColumnId) {
-        throw new Error('Нет доступных колонок');
-      }
-
-      const columnId = firstColumnId;
-      console.log('Отправка запроса на создание тикета:', {
-        ...ticketData,
-        column_id: columnId
-      });
-      
-      const response = await api.post('/api/cards', {
-        ...ticketData,
-        column_id: columnId
-      });
-
-      console.log('Создан новый тикет:', response.data);
-      
-      // Обновляем колонки после создания тикета
-      await fetchColumns();
-      setIsCreateModalOpen(false);
-    } catch (err) {
-      console.error('Ошибка при создании тикета:', err);
-      setError('Не удалось создать тикет');
-    }
-  };
-
   const handleCardCreated = async (newCard) => {
-    console.log('handleCardCreated вызван, newCard:', newCard);
+    console.log('KanbanBoard: handleCardCreated вызван, newCard:', newCard);
+    console.log('KanbanBoard: тип newCard:', typeof newCard);
+    console.log('KanbanBoard: newCard JSON:', JSON.stringify(newCard));
     try {
+      console.log('KanbanBoard: обновляю колонки после создания карточки...');
       await fetchColumns();
+      console.log('KanbanBoard: колонки успешно обновлены');
     } catch (error) {
-      console.error('Ошибка при обновлении колонок:', error);
+      console.error('KanbanBoard: ошибка при обновлении колонок:', error);
       setError('Ошибка при обновлении колонок');
     }
   };
@@ -211,12 +172,11 @@ const KanbanBoard = () => {
           </Button>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', minHeight: 'calc(100vh - 200px)' }}>
+        <Box sx={{ display: 'flex', gap: 3, overflowX: 'auto', pb: 2 }}>
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
               column={column}
-              onCardCreated={handleCardCreated}
             />
           ))}
         </Box>

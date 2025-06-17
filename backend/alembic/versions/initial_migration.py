@@ -80,6 +80,9 @@ def upgrade():
 
     # Создаем базовые колонки
     op.execute("""
+        INSERT INTO boards (id, title) VALUES (1, 'Default Board')
+    """)
+    op.execute("""
         INSERT INTO columns (title, position, board_id) VALUES
         ('Бэклог', 0, 1),
         ('В работе', 1, 1),

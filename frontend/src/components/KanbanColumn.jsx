@@ -7,49 +7,40 @@ import {
   Card,
   CardContent,
   Chip,
-  Button,
   Avatar
 } from '@mui/material';
-import { api } from '../services/api';
-import CreateTicketModal from './CreateTicketModal';
+import { getCard } from '../services/api';
 import EditTicketModal from './EditTicketModal';
-import AddIcon from '@mui/icons-material/Add';
 
-const KanbanColumn = ({ column, onCardCreated }) => {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+const KanbanColumn = ({ column }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
-  const [users, setUsers] = useState([]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await api.get('/api/users');
-        setUsers(response.data);
-      } catch (error) {
-        console.error('Ошибка при загрузке пользователей:', error);
-      }
-    };
-    fetchUsers();
-  }, []);
-
-  const handleCardClick = (card) => {
-    setSelectedCard(card);
-    setIsEditModalOpen(true);
+  const handleCardClick = async (card) => {
+    try {
+      console.log('KanbanColumn: клик по карточке:', card);
+      // Получаем полные данные карточки
+      const response = await getCard(card.id);
+      console.log('KanbanColumn: получены полные данные карточки:', response);
+      setSelectedCard(response);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error('Ошибка при получении данных карточки:', error);
+    }
   };
 
   const handleEditSuccess = async (updatedCard) => {
     setIsEditModalOpen(false);
     setSelectedCard(null);
-    // Обновляем колонки после редактирования
-    if (onCardCreated) {
-      onCardCreated(updatedCard);
-    }
+    // Обновляем данные, перезагружая страницу
+    window.location.reload();
   };
 
   if (!column) return null;
   const cards = column.cards || [];
   console.log('KanbanColumn render:', { columnId: column.id, cardsCount: cards.length, cards });
+
+
 
   return (
     <Paper
@@ -81,6 +72,9 @@ const KanbanColumn = ({ column, onCardCreated }) => {
           >
             {cards.map((card, index) => {
               console.log('Рендеринг карточки:', card);
+              console.log('Теги карточки:', card.tags);
+              console.log('Тип тегов:', typeof card.tags);
+              console.log('Теги карточки (JSON):', JSON.stringify(card.tags));
               const draggableId = `card-${card.id}`;
               console.log('Draggable ID:', draggableId);
               return (
@@ -107,23 +101,44 @@ const KanbanColumn = ({ column, onCardCreated }) => {
                         <Typography variant="h6" gutterBottom>
                           {card.title}
                         </Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                          {card.assignee && (
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Avatar sx={{ width: 24, height: 24, mr: 1 }}>
-                                {card.assignee.username[0].toUpperCase()}
-                              </Avatar>
-                              <Typography variant="body2">
-                                {card.assignee.username}
-                              </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            {card.assignee && (
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Avatar sx={{ width: 24, height: 24, mr: 1 }}>
+                                  {typeof card.assignee === 'string' 
+                                    ? card.assignee[0]?.toUpperCase() || '?' 
+                                    : card.assignee.username?.[0]?.toUpperCase() || '?'
+                                  }
+                                </Avatar>
+                                <Typography variant="body2">
+                                  {typeof card.assignee === 'string' 
+                                    ? card.assignee 
+                                    : card.assignee.username || 'Не назначен'
+                                  }
+                                </Typography>
+                              </Box>
+                            )}
+                            <Chip
+                              label={`${card.story_points} SP`}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          </Box>
+                          {card.tags && card.tags.length > 0 && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {card.tags.map((tag) => (
+                                <Chip
+                                  key={tag.id}
+                                  label={tag.name}
+                                  size="small"
+                                  color="secondary"
+                                  variant="outlined"
+                                />
+                              ))}
                             </Box>
                           )}
-                          <Chip
-                            label={`${card.story_points} SP`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
                         </Box>
                       </CardContent>
                     </Card>
@@ -135,22 +150,6 @@ const KanbanColumn = ({ column, onCardCreated }) => {
           </Box>
         )}
       </Droppable>
-
-      <Button
-        variant="outlined"
-        startIcon={<AddIcon />}
-        onClick={() => setIsCreateModalOpen(true)}
-        sx={{ mt: 2 }}
-      >
-        Добавить тикет
-      </Button>
-
-      <CreateTicketModal
-        open={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={onCardCreated}
-        columnId={column.id}
-      />
 
       <EditTicketModal
         open={isEditModalOpen}

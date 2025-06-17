@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { getCurrentUser, login as apiLogin, register as apiRegister } from '../services/api';
 
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -12,105 +12,76 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const userData = await getCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          console.error('Ошибка при проверке аутентификации:', error);
+          localStorage.removeItem('token');
+        }
+      }
+      setLoading(false);
+    };
+
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await api.get('/api/auth/me');
-      setCurrentUser(response.data);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Ошибка проверки аутентификации:', error);
-      localStorage.removeItem('token');
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const login = async (username, password) => {
     try {
-      console.log('Начало процесса входа в AuthContext');
-      const response = await api.post('/api/auth/login', { username, password });
-      console.log('Получен ответ от сервера:', response.data);
+      const response = await apiLogin({ username, password });
       
-      if (response.data.access_token) {
-        console.log('Токен получен, сохраняем в localStorage');
-        localStorage.setItem('token', response.data.access_token);
-        setIsAuthenticated(true);
+      if (response.access_token) {
+        localStorage.setItem('token', response.access_token);
         
-        // Получаем информацию о пользователе
-        console.log('Получаем информацию о пользователе');
-        const userResponse = await api.get('/api/auth/me');
-        console.log('Получена информация о пользователе:', userResponse.data);
-        setCurrentUser(userResponse.data);
+        // Получаем данные пользователя
+        const userResponse = await getCurrentUser();
+        setUser(userResponse);
         
-        return true;
+        return { success: true };
       } else {
-        console.error('Токен не получен в ответе:', response.data);
-        return false;
+        return { success: false, error: 'Неверные учетные данные' };
       }
     } catch (error) {
-      console.error('Ошибка при входе:', {
-        type: error.name,
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      throw error;
+      console.error('Ошибка при входе:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Ошибка при входе в систему' 
+      };
     }
   };
 
-  const register = async (username, password) => {
+  const register = async (userData) => {
     try {
-      console.log('AuthContext: Начало процесса регистрации');
-      console.log('AuthContext: Отправка запроса на регистрацию:', { username });
-      
-      const response = await api.post('/api/auth/register', {
-        username,
-        password
-      });
-      
-      console.log('AuthContext: Регистрация успешна:', response.data);
-      return true;
+      const response = await apiRegister(userData);
+      return { success: true, data: response };
     } catch (error) {
-      console.error('AuthContext: Ошибка регистрации:');
-      console.error('AuthContext: Тип ошибки:', error.constructor.name);
-      console.error('AuthContext: Сообщение ошибки:', error.message);
-      console.error('AuthContext: Данные ответа:', error.response?.data);
-      throw error;
+      console.error('Ошибка при регистрации:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Ошибка при регистрации' 
+      };
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
-    setIsAuthenticated(false);
-    setCurrentUser(null);
+    setUser(null);
   };
 
   const value = {
-    isAuthenticated,
+    user,
     loading,
     login,
     register,
     logout,
-    checkAuth,
-    currentUser
+    getCurrentUser
   };
 
   if (loading) {

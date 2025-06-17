@@ -17,7 +17,7 @@ import {
   MenuItem,
   TextField
 } from '@mui/material';
-import { api } from '../services/api';
+import { getUsers, getStatistics } from '../services/api';
 
 const Statistics = () => {
   const [loading, setLoading] = useState(true);
@@ -36,8 +36,8 @@ const Statistics = () => {
   useEffect(() => {
     const fetchAssignees = async () => {
       try {
-        const response = await api.get('/api/users');
-        setAssignees(response.data);
+        const usersData = await getUsers();
+        setAssignees(usersData);
       } catch (err) {
         console.error('Ошибка при загрузке исполнителей:', err);
       }
@@ -54,9 +54,9 @@ const Statistics = () => {
         if (startDate) params.start_date = startDate;
         if (endDate) params.end_date = endDate;
         
-        const response = await api.get('/api/statistics', { params });
-        console.log('Получены данные статистики:', response.data);
-        setStats(response.data);
+        const statsData = await getStatistics(params);
+        console.log('Получены данные статистики:', statsData);
+        setStats(statsData);
         setError(null);
       } catch (err) {
         console.error('Ошибка при загрузке статистики:', err);
