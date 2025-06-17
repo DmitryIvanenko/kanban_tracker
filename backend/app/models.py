@@ -17,6 +17,7 @@ class User(Base):
     boards = relationship("Board", back_populates="owner")
     assigned_cards = relationship("Card", foreign_keys="Card.assignee_id", back_populates="assignee")
     created_cards = relationship("Card", foreign_keys="Card.created_by", back_populates="creator")
+    comments = relationship("Comment", back_populates="user")
 
 class Board(Base):
     __tablename__ = "boards"
@@ -60,6 +61,7 @@ class Card(Base):
     assignee = relationship("User", foreign_keys=[assignee_id], back_populates="assigned_cards")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_cards")
     history = relationship("CardHistory", back_populates="card", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="ticket", cascade="all, delete-orphan")
 
 class CardHistory(Base):
     __tablename__ = "card_history"
@@ -70,4 +72,16 @@ class CardHistory(Base):
     details = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    card = relationship("Card", back_populates="history") 
+    card = relationship("Card", back_populates="history")
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    ticket_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    ticket = relationship("Card", back_populates="comments")
+    user = relationship("User", back_populates="comments") 

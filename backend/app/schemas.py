@@ -122,4 +122,20 @@ class Board(BoardBase):
     columns: List[Column] = []
 
     class Config:
+        from_attributes = True
+
+class CommentBase(BaseModel):
+    content: str
+
+class CommentCreate(CommentBase):
+    pass
+
+class Comment(CommentBase):
+    id: int
+    created_at: datetime
+    ticket_id: int
+    user_id: int
+    user: User
+
+    class Config:
         from_attributes = True 

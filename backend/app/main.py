@@ -482,4 +482,35 @@ async def update_card(
     except Exception as e:
         logger.error(f"Неожиданная ошибка при обновлении тикета: {str(e)}")
         logger.error("Полный стек ошибки:", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tickets/{ticket_id}/comments", response_model=List[schemas.Comment])
+def get_ticket_comments(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    comments = db.query(models.Comment).filter(models.Comment.ticket_id == ticket_id).all()
+    # Загружаем данные о пользователях для каждого комментария
+    for comment in comments:
+        comment.user = db.query(models.User).filter(models.User.id == comment.user_id).first()
+    return comments
+
+@app.post("/tickets/{ticket_id}/comments", response_model=schemas.Comment)
+def create_comment(
+    ticket_id: int,
+    comment: schemas.CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db_comment = models.Comment(
+        content=comment.content,
+        ticket_id=ticket_id,
+        user_id=current_user.id
+    )
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    # Загружаем данные о пользователе для нового комментария
+    db_comment.user = current_user
+    return db_comment 
