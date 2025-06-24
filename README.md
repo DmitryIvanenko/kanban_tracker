@@ -31,7 +31,15 @@ git clone <repository-url>
 cd kanban-tracker
 ```
 
-2. Запустите проект с помощью Docker Compose:
+2. Настройте переменные окружения:
+```bash
+cp .env.example .env
+```
+Отредактируйте файл `.env` и укажите ваш токен Telegram бота:
+- Получите токен у @BotFather в Telegram
+- Замените `your_telegram_bot_token_here` на ваш токен
+
+3. Запустите проект с помощью Docker Compose:
 ```bash
 docker-compose up --build
 ```
