@@ -189,9 +189,9 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
     setIsDeleteDialogOpen(false);
   };
 
-  const isDoneColumn = columnTitle === 'Done';
+  const isDoneColumn = columnTitle === 'Готово';
   const editButton = isDoneColumn ? (
-    <Tooltip title="Тикет в колонке Done нельзя редактировать">
+    <Tooltip title="Тикет в колонке Готово нельзя редактировать">
       <span>
         <Button 
           variant="contained" 

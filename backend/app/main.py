@@ -204,7 +204,7 @@ async def root():
 @app.get("/api/columns")
 async def get_columns(db: Session = Depends(get_db)):
     try:
-        columns = db.query(models.KanbanColumn).all()
+        columns = db.query(models.KanbanColumn).order_by(models.KanbanColumn.position).all()
         # Загружаем карточки для каждой колонки
         for column in columns:
             column.cards = db.query(models.Card).filter(models.Card.column_id == column.id).all()
