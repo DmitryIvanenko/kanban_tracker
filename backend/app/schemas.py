@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, validator
 from datetime import datetime
 from typing import Optional, List
 import re
+from .models import RealEstateType
 
 class LoginRequest(BaseModel):
     username: str
@@ -130,6 +131,7 @@ class CardBase(BaseModel):
     column_id: int
     assignee_id: Optional[int] = None
     approver_id: Optional[int] = None
+    real_estate_type: Optional[str] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -181,6 +183,7 @@ class CardUpdate(BaseModel):
     column_id: Optional[int] = None
     assignee_id: Optional[int] = None
     approver_id: Optional[int] = None
+    real_estate_type: Optional[str] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')

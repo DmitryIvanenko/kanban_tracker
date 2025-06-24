@@ -1,8 +1,19 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, Table
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, Table, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
 from datetime import datetime
+import enum
+
+class RealEstateType(enum.Enum):
+    OFFICE = "офис"
+    BUILDING = "здание"
+    BUILT_IN_PREMISES = "встроенные помещения"
+    INDUSTRIAL_REAL_ESTATE = "производственная недвижимость"
+    WAREHOUSE_PREMISES = "складские помещения"
+    COMMERCIAL_REAL_ESTATE = "торговая недвижимость"
+    HOTELS = "отели"
+    OTHER_REAL_ESTATE = "иная недвижимость"
 
 class User(Base):
     __tablename__ = "users"
@@ -72,6 +83,17 @@ class Card(Base):
     assignee_id = Column(Integer, ForeignKey("users.id"))
     approver_id = Column(Integer, ForeignKey("users.id"))
     created_by = Column(Integer, ForeignKey("users.id"))
+    real_estate_type = Column(Enum(
+        'офис',
+        'здание',
+        'встроенные помещения',
+        'производственная недвижимость',
+        'складские помещения',
+        'торговая недвижимость',
+        'отели',
+        'иная недвижимость',
+        name='real_estate_type_enum'
+    ), nullable=True, comment="Тип недвижимости")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

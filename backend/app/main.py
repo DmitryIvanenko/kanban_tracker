@@ -242,6 +242,7 @@ async def get_columns(db: Session = Depends(get_db)):
                     "column_id": card.column_id,
                     "assignee_id": card.assignee_id,
                     "approver_id": card.approver_id,
+                    "real_estate_type": card.real_estate_type,
                     "created_at": card.created_at,
                     "updated_at": card.updated_at,
                     "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -303,14 +304,9 @@ def get_or_create_tag(db: Session, tag_name: str) -> models.Tag:
             logger.info(f"Создаем новый тег: {tag_name}")
             tag = models.Tag(name=tag_name)
             db.add(tag)
-            try:
-                db.commit()
-                db.refresh(tag)
-                logger.info(f"Тег успешно создан: {tag.name}, id: {tag.id}")
-            except Exception as e:
-                logger.error(f"Ошибка при создании тега: {str(e)}")
-                db.rollback()
-                raise
+            # Не делаем commit - flush достаточно для получения ID
+            db.flush()
+            logger.info(f"Тег успешно создан: {tag.name}, id: {tag.id}")
         else:
             logger.info(f"Найден существующий тег: {tag.name}, id: {tag.id}")
         
@@ -344,13 +340,8 @@ def update_card_tags(db: Session, card: models.Card, tag_names: List[str]):
             card.tags.append(tag)
             logger.info(f"Тег добавлен: {tag.name}, id: {tag.id}")
         
-        try:
-            db.commit()
-            logger.info(f"Теги обновлены: {[tag.name for tag in card.tags]}")
-        except Exception as e:
-            logger.error(f"Ошибка при сохранении тегов: {str(e)}")
-            db.rollback()
-            raise
+        # Не делаем commit здесь - это должно происходить в вызывающей функции
+        logger.info(f"Теги подготовлены для сохранения: {[tag.name for tag in card.tags]}")
     except Exception as e:
         logger.error(f"Ошибка в update_card_tags: {str(e)}")
         logger.error("Полный стек ошибки:", exc_info=True)
@@ -383,6 +374,18 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 raise HTTPException(status_code=404, detail="Согласующий не найден")
             logger.info(f"Согласующий найден: {approver.username}")
 
+        # Конвертируем строковое значение типа недвижимости в enum
+        real_estate_type_value = None
+        if card.real_estate_type:
+            # Ищем enum по имени константы и получаем его значение
+            try:
+                real_estate_type_enum = models.RealEstateType[card.real_estate_type]
+                real_estate_type_value = real_estate_type_enum.value  # Получаем строковое значение
+                logger.info(f"Тип недвижимости конвертирован: {card.real_estate_type} -> {real_estate_type_value}")
+            except KeyError:
+                logger.error(f"Неизвестный тип недвижимости: {card.real_estate_type}")
+                raise HTTPException(status_code=422, detail=f"Неизвестный тип недвижимости: {card.real_estate_type}")
+
         # Создаем новую карточку
         db_card = models.Card(
             title=card.title,
@@ -392,12 +395,13 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             column_id=card.column_id,
             assignee_id=card.assignee_id,
             approver_id=card.approver_id,
+            real_estate_type=real_estate_type_value,  # Сохраняем строковое значение
             created_by=current_user.id
         )
         
         db.add(db_card)
-        db.commit()
-        db.refresh(db_card)
+        db.flush()  # Получаем ID карточки без commit
+        logger.info(f"Карточка создана с ID: {db_card.id}")
         
         # Добавляем теги
         if card.tags:
@@ -418,11 +422,16 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "story_points": card.story_points,
                 "column_id": card.column_id,
                 "assignee_id": card.assignee_id,
+                "real_estate_type": card.real_estate_type,
                 "tags": card.tags
             })
         )
         db.add(history_entry)
+        
+        # Делаем окончательный commit всех изменений
         db.commit()
+        db.refresh(db_card)
+        logger.info(f"Карточка успешно сохранена в базу данных")
         
         # Отправляем Telegram уведомление согласующему, если он назначен
         if approver:
@@ -446,6 +455,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
             "approver_id": db_card.approver_id,
+            "real_estate_type": real_estate_type_value,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -471,10 +481,15 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "email": approver.email
             }
         
+        logger.info(f"Возвращаем ответ: {response_data}")
         return response_data
+    except HTTPException:
+        # Повторно выбрасываем HTTPException без изменений
+        raise
     except Exception as e:
         logger.error(f"Неожиданная ошибка при создании тикета: {str(e)}")
         logger.error("Полный стек ошибки:", exc_info=True)
+        db.rollback()  # Откатываем транзакцию
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/cards/{card_id}/move")
@@ -530,6 +545,16 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
 async def get_users(db: Session = Depends(get_db)):
     users = db.query(models.User).all()
     return users
+
+@app.get("/api/real-estate-types")
+async def get_real_estate_types():
+    """Получить все доступные типы недвижимости"""
+    return {
+        "types": [
+            {"value": member.name, "label": member.value}
+            for member in models.RealEstateType
+        ]
+    }
 
 @app.get("/api/statistics")
 async def get_statistics(
@@ -657,8 +682,27 @@ async def update_card(
         update_data = card_update.dict(exclude_unset=True)
         logger.info(f"Данные для обновления: {update_data}")
         
+        # Конвертируем тип недвижимости если он есть
+        real_estate_type_value = None
+        if 'real_estate_type' in update_data and update_data['real_estate_type']:
+            real_estate_type_constant = update_data['real_estate_type']
+            logger.info(f"Получен тип недвижимости: {real_estate_type_constant}")
+            
+            # Конвертируем константу enum в значение enum для базы данных
+            try:
+                enum_member = models.RealEstateType[real_estate_type_constant]
+                real_estate_type_value = enum_member.value
+                logger.info(f"Конвертирован тип недвижимости: {real_estate_type_constant} -> {real_estate_type_value}")
+            except KeyError:
+                logger.error(f"Неизвестный тип недвижимости: {real_estate_type_constant}")
+                raise HTTPException(status_code=400, detail=f"Неизвестный тип недвижимости: {real_estate_type_constant}")
+        
         for key, value in update_data.items():
-            if key != 'tags':  # Исключаем теги из общего обновления
+            if key == 'real_estate_type':
+                # Используем конвертированное значение для типа недвижимости
+                if real_estate_type_value is not None:
+                    setattr(db_card, key, real_estate_type_value)
+            elif key != 'tags':  # Исключаем теги из общего обновления
                 setattr(db_card, key, value)
 
         # Обновляем теги
@@ -725,6 +769,7 @@ async def update_card(
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
             "approver_id": db_card.approver_id,
+            "real_estate_type": real_estate_type_value,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]

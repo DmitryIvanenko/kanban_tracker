@@ -12,6 +12,22 @@ import {
 import { getCard } from '../services/api';
 import EditTicketModal from './EditTicketModal';
 
+// Функция для получения цвета типа недвижимости
+const getRealEstateTypeColor = (realEstateType) => {
+  const colorMap = {
+    'офис': '#fba097',
+    'здание': '#ffc5a1',
+    'встроенные помещения': '#ece7ac',
+    'производственная недвижимость': '#c6efbf',
+    'складские помещения': '#c4dbf7',
+    'торговая недвижимость': '#7b66b5',
+    'отели': '#8c4c9a',
+    'иная недвижимость': '#f3efe6'
+  };
+  
+  return colorMap[realEstateType] || '#f5f5f5'; // По умолчанию серый цвет
+};
+
 const KanbanColumn = ({ column }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
@@ -88,13 +104,18 @@ const KanbanColumn = ({ column }) => {
                       sx={{
                         mb: 2,
                         cursor: 'pointer',
+                        position: 'relative',
                         '&:active': { cursor: 'grabbing' },
                         bgcolor: snapshot.isDragging ? 'action.selected' : 'background.paper',
                         transform: snapshot.isDragging ? 'scale(1.02)' : 'none',
                         transition: 'all 0.2s ease',
                         '&:hover': {
                           boxShadow: 3
-                        }
+                        },
+                        // Цветовая подсветка левой части карточки
+                        borderLeft: card.real_estate_type 
+                          ? `6px solid ${getRealEstateTypeColor(card.real_estate_type)}`
+                          : '6px solid transparent'
                       }}
                     >
                       <CardContent>

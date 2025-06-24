@@ -135,6 +135,12 @@ export const getUsers = async () => {
   return response.data;
 };
 
+// Функция для получения типов недвижимости
+export const getRealEstateTypes = async () => {
+  const response = await api.get('/api/real-estate-types');
+  return response.data;
+};
+
 export const getCurrentUser = async () => {
   const response = await api.get('/api/auth/me');
   return response.data;

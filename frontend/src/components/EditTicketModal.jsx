@@ -16,7 +16,7 @@ import {
   Tooltip,
   Divider
 } from '@mui/material';
-import { api, updateCard, deleteCard, getUsers, getColumn } from '../services/api';
+import { api, updateCard, deleteCard, getUsers, getColumn, getRealEstateTypes } from '../services/api';
 import CommentsSection from './CommentsSection';
 
 const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
@@ -32,6 +32,8 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [tags, setTags] = useState([]);
   const [currentTag, setCurrentTag] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [realEstateType, setRealEstateType] = useState('');
+  const [realEstateTypes, setRealEstateTypes] = useState([]);
 
   useEffect(() => {
     if (ticket) {
@@ -41,6 +43,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       setStoryPoints(ticket.story_points?.toString() || '');
       setAssigneeId(ticket.assignee_id || '');
       setApproverId(ticket.approver_id || '');
+      setRealEstateType(ticket.real_estate_type || '');
       console.log('EditTicketModal: теги тикета:', ticket.tags);
       console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
       console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
@@ -65,15 +68,19 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   }, [ticket]);
 
   useEffect(() => {
-    const fetchUsersData = async () => {
+    const fetchData = async () => {
       try {
-        const usersData = await getUsers();
+        const [usersData, realEstateTypesData] = await Promise.all([
+          getUsers(),
+          getRealEstateTypes()
+        ]);
         setUsers(usersData);
+        setRealEstateTypes(realEstateTypesData.types);
       } catch (error) {
-        console.error('Ошибка при загрузке пользователей:', error);
+        console.error('Ошибка при загрузке данных:', error);
       }
     };
-    fetchUsersData();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -145,6 +152,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
         story_points: parseInt(storyPoints),
         assignee_id: assigneeId || null,
         approver_id: approverId || null,
+        real_estate_type: realEstateType || null,
         tags: formattedTags
       };
       
@@ -301,6 +309,24 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 ))}
               </Select>
             </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Тип недвижимости</InputLabel>
+              <Select
+                value={realEstateType}
+                label="Тип недвижимости"
+                onChange={(e) => setRealEstateType(e.target.value)}
+                disabled={!isEditing}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {realEstateTypes.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             {isEditing && (
               <Box>
                 <TextField
@@ -341,10 +367,10 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 </Box>
               </Box>
             )}
-            {!isEditing && (ticket?.assignee || ticket?.approver) && (
+            {!isEditing && (ticket?.assignee || ticket?.approver || ticket?.real_estate_type) && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Участники:
+                  Дополнительная информация:
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {ticket?.assignee && (
@@ -364,6 +390,16 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       </Typography>
                       <Typography variant="body2">
                         {ticket.approver.username}
+                      </Typography>
+                    </Box>
+                  )}
+                  {ticket?.real_estate_type && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Тип недвижимости:
+                      </Typography>
+                      <Typography variant="body2">
+                        {realEstateTypes.find(type => type.value === ticket.real_estate_type)?.label || ticket.real_estate_type}
                       </Typography>
                     </Box>
                   )}

@@ -14,7 +14,7 @@ import {
   Typography,
   Chip
 } from '@mui/material';
-import { getUsers, createCard } from '../services/api';
+import { getUsers, createCard, getRealEstateTypes } from '../services/api';
 
 const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const [title, setTitle] = useState('');
@@ -26,17 +26,23 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const [users, setUsers] = useState([]);
   const [tags, setTags] = useState([]);
   const [currentTag, setCurrentTag] = useState('');
+  const [realEstateType, setRealEstateType] = useState('');
+  const [realEstateTypes, setRealEstateTypes] = useState([]);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       try {
-        const usersData = await getUsers();
+        const [usersData, realEstateTypesData] = await Promise.all([
+          getUsers(),
+          getRealEstateTypes()
+        ]);
         setUsers(usersData);
+        setRealEstateTypes(realEstateTypesData.types);
       } catch (error) {
-        console.error('Ошибка при загрузке пользователей:', error);
+        console.error('Ошибка при загрузке данных:', error);
       }
     };
-    fetchUsers();
+    fetchData();
   }, []);
 
   const handleTagKeyPress = (e) => {
@@ -64,6 +70,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
     console.log('CreateTicketModal: storyPoints:', storyPoints);
     console.log('CreateTicketModal: columnId:', columnId);
     console.log('CreateTicketModal: assigneeId:', assigneeId);
+    console.log('CreateTicketModal: realEstateType:', realEstateType);
     console.log('CreateTicketModal: tags:', tags);
 
     if (!title.trim()) {
@@ -85,6 +92,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       column_id: columnId,
       assignee_id: assigneeId || null,
       approver_id: approverId || null,
+      real_estate_type: realEstateType || null,
       tags
     };
 
@@ -101,6 +109,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       setStoryPoints('');
       setAssigneeId('');
       setApproverId('');
+      setRealEstateType('');
       setTags([]);
       setCurrentTag('');
       
@@ -188,6 +197,23 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
                 {users.map((user) => (
                   <MenuItem key={user.id} value={user.id}>
                     {user.username}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Тип недвижимости</InputLabel>
+              <Select
+                value={realEstateType}
+                label="Тип недвижимости"
+                onChange={(e) => setRealEstateType(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {realEstateTypes.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
                   </MenuItem>
                 ))}
               </Select>
