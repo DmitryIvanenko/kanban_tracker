@@ -18,6 +18,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/kanban
       - SECRET_KEY=your-secret-key-here
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
     depends_on:
       - db
     networks:

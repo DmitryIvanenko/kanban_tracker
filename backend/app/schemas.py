@@ -26,6 +26,7 @@ class CardHistory(CardHistoryBase):
 
 class UserBase(BaseModel):
     username: str
+    telegram: str
 
     @validator('username')
     def validate_username(cls, v):
@@ -37,6 +38,17 @@ class UserBase(BaseModel):
             raise ValueError('Имя пользователя не должно превышать 50 символов')
         if not re.match(r'^[a-zA-Zа-яА-ЯёЁ0-9_\s-]+$', v):
             raise ValueError('Имя пользователя может содержать только буквы, цифры, пробелы, дефис и подчеркивание')
+        return v
+
+    @validator('telegram')
+    def validate_telegram(cls, v):
+        if not v:
+            raise ValueError('Telegram username не может быть пустым')
+        if len(v) > 100:
+            raise ValueError('Telegram username не должен превышать 100 символов')
+        # Проверяем, что это либо username (@username), либо chat_id (только цифры)
+        if not (v.startswith('@') or v.isdigit()):
+            raise ValueError('Telegram должен быть в формате @username или chat_id (только цифры)')
         return v
 
 class UserCreate(UserBase):
@@ -55,6 +67,7 @@ class User(UserBase):
     is_active: bool
     created_at: datetime
     email: Optional[str] = None
+    telegram: str
 
     class Config:
         from_attributes = True
@@ -116,6 +129,7 @@ class CardBase(BaseModel):
     story_points: Optional[int] = None
     column_id: int
     assignee_id: Optional[int] = None
+    approver_id: Optional[int] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -166,6 +180,7 @@ class CardUpdate(BaseModel):
     story_points: Optional[int] = None
     column_id: Optional[int] = None
     assignee_id: Optional[int] = None
+    approver_id: Optional[int] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -193,6 +208,7 @@ class Card(CardBase):
     created_at: datetime
     updated_at: datetime
     assignee: Optional[User] = None
+    approver: Optional[User] = None
     tags: List[Tag] = []
 
     class Config:

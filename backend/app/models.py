@@ -11,11 +11,13 @@ class User(Base):
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=True)
     hashed_password = Column(String(100))
+    telegram = Column(String(100), nullable=False)  # Telegram username или chat_id (обязательное поле)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     boards = relationship("Board", back_populates="owner")
     assigned_cards = relationship("Card", foreign_keys="Card.assignee_id", back_populates="assignee")
+    approved_cards = relationship("Card", foreign_keys="Card.approver_id", back_populates="approver")
     created_cards = relationship("Card", foreign_keys="Card.created_by", back_populates="creator")
     comments = relationship("Comment", back_populates="user")
 
@@ -68,12 +70,14 @@ class Card(Base):
     story_points = Column(Integer)
     column_id = Column(Integer, ForeignKey("columns.id"))
     assignee_id = Column(Integer, ForeignKey("users.id"))
+    approver_id = Column(Integer, ForeignKey("users.id"))
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     column = relationship("KanbanColumn", back_populates="cards")
     assignee = relationship("User", foreign_keys=[assignee_id], back_populates="assigned_cards")
+    approver = relationship("User", foreign_keys=[approver_id], back_populates="approved_cards")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_cards")
     history = relationship("CardHistory", back_populates="card", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="ticket", cascade="all, delete-orphan")

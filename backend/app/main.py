@@ -14,6 +14,7 @@ from typing import List, Optional
 import logging
 import json
 from .auth import get_current_user, create_access_token, verify_password
+from .telegram_bot import send_approver_notification, send_approver_change_notification
 import re
 from fastapi.responses import JSONResponse
 
@@ -132,6 +133,7 @@ async def register_user(user: schemas.UserCreate, db: Session = Depends(get_db))
     db_user = models.User(
         username=user.username,
         hashed_password=hashed_password,
+        telegram=user.telegram,
         is_active=True
     )
     
@@ -237,6 +239,7 @@ async def get_columns(db: Session = Depends(get_db)):
                     "story_points": card.story_points,
                     "column_id": card.column_id,
                     "assignee_id": card.assignee_id,
+                    "approver_id": card.approver_id,
                     "created_at": card.created_at,
                     "updated_at": card.updated_at,
                     "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -248,6 +251,14 @@ async def get_columns(db: Session = Depends(get_db)):
                         "username": card.assignee.username,
                         "is_active": card.assignee.is_active,
                         "created_at": card.assignee.created_at
+                    }
+                
+                if card.approver:
+                    card_data["approver"] = {
+                        "id": card.approver.id,
+                        "username": card.approver.username,
+                        "is_active": card.approver.is_active,
+                        "created_at": card.approver.created_at
                     }
                 
                 column_data["cards"].append(card_data)
@@ -358,6 +369,14 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 raise HTTPException(status_code=404, detail="Исполнитель не найден")
             logger.info(f"Исполнитель найден: {assignee.username}")
 
+        # Проверяем существование согласующего, если он указан
+        approver = None
+        if card.approver_id:
+            approver = db.query(models.User).filter(models.User.id == card.approver_id).first()
+            if not approver:
+                raise HTTPException(status_code=404, detail="Согласующий не найден")
+            logger.info(f"Согласующий найден: {approver.username}")
+
         # Создаем новую карточку
         db_card = models.Card(
             title=card.title,
@@ -366,6 +385,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             story_points=card.story_points,
             column_id=card.column_id,
             assignee_id=card.assignee_id,
+            approver_id=card.approver_id,
             created_by=current_user.id
         )
         
@@ -398,6 +418,18 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
         db.add(history_entry)
         db.commit()
         
+        # Отправляем Telegram уведомление согласующему, если он назначен
+        if approver:
+            try:
+                logger.info(f"Отправка Telegram уведомления согласующему {approver.username}")
+                success = send_approver_notification(approver, db_card)
+                if success:
+                    logger.info(f"Telegram уведомление успешно отправлено согласующему {approver.username}")
+                else:
+                    logger.warning(f"Не удалось отправить Telegram уведомление согласующему {approver.username}")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке Telegram уведомления: {str(e)}")
+        
         # Формируем ответ
         response_data = {
             "id": db_card.id,
@@ -407,6 +439,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             "story_points": db_card.story_points,
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
+            "approver_id": db_card.approver_id,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -418,6 +451,14 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "username": assignee.username,
                 "is_active": assignee.is_active,
                 "created_at": assignee.created_at
+            }
+        
+        if approver:
+            response_data["approver"] = {
+                "id": approver.id,
+                "username": approver.username,
+                "is_active": approver.is_active,
+                "created_at": approver.created_at
             }
         
         return response_data
@@ -585,12 +626,22 @@ async def update_card(
         if not db_card:
             raise HTTPException(status_code=404, detail="Карточка не найдена")
 
+        # Сохраняем старого согласующего для отправки уведомлений
+        old_approver = db_card.approver if db_card.approver_id else None
+        
         # Проверяем существование исполнителя, если он указан
         assignee = None
         if card_update.assignee_id:
             assignee = db.query(models.User).filter(models.User.id == card_update.assignee_id).first()
             if not assignee:
                 raise HTTPException(status_code=404, detail="Исполнитель не найден")
+
+        # Проверяем существование согласующего, если он указан
+        approver = None
+        if card_update.approver_id:
+            approver = db.query(models.User).filter(models.User.id == card_update.approver_id).first()
+            if not approver:
+                raise HTTPException(status_code=404, detail="Согласующий не найден")
 
         # Обновляем поля карточки
         update_data = card_update.dict(exclude_unset=True)
@@ -642,6 +693,18 @@ async def update_card(
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Ошибка при сохранении в базу данных: {str(e)}")
 
+        # Отправляем Telegram уведомления при изменении согласующего
+        if 'approver_id' in update_data:
+            try:
+                logger.info(f"Изменение согласующего: {old_approver.username if old_approver else 'None'} -> {approver.username if approver else 'None'}")
+                success = send_approver_change_notification(old_approver, approver, db_card)
+                if success:
+                    logger.info("Telegram уведомления о смене согласующего успешно отправлены")
+                else:
+                    logger.warning("Не удалось отправить некоторые Telegram уведомления о смене согласующего")
+            except Exception as e:
+                logger.error(f"Ошибка при отправке Telegram уведомлений о смене согласующего: {str(e)}")
+
         # Формируем ответ
         response_data = {
             "id": db_card.id,
@@ -651,6 +714,7 @@ async def update_card(
             "story_points": db_card.story_points,
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
+            "approver_id": db_card.approver_id,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -662,6 +726,14 @@ async def update_card(
                 "username": assignee.username,
                 "is_active": assignee.is_active,
                 "created_at": assignee.created_at
+            }
+
+        if approver:
+            response_data["approver"] = {
+                "id": approver.id,
+                "username": approver.username,
+                "is_active": approver.is_active,
+                "created_at": approver.created_at
             }
 
         logger.info(f"Успешно обновлена карточка {card_id}")
@@ -731,6 +803,7 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
             "story_points": card.story_points,
             "column_id": card.column_id,
             "assignee_id": card.assignee_id,
+            "approver_id": card.approver_id,
             "created_at": card.created_at,
             "updated_at": card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -742,6 +815,14 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
                 "username": card.assignee.username,
                 "is_active": card.assignee.is_active,
                 "created_at": card.assignee.created_at
+            }
+        
+        if card.approver:
+            response_data["approver"] = {
+                "id": card.approver.id,
+                "username": card.approver.username,
+                "is_active": card.approver.is_active,
+                "created_at": card.approver.created_at
             }
         
         logger.info(f"Отправляем ответ для карточки {card_id}: {response_data}")

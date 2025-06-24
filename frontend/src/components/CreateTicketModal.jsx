@@ -21,6 +21,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const [description, setDescription] = useState('');
   const [storyPoints, setStoryPoints] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [approverId, setApproverId] = useState('');
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [tags, setTags] = useState([]);
@@ -83,6 +84,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       story_points: parseInt(storyPoints),
       column_id: columnId,
       assignee_id: assigneeId || null,
+      approver_id: approverId || null,
       tags
     };
 
@@ -98,6 +100,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       setDescription('');
       setStoryPoints('');
       setAssigneeId('');
+      setApproverId('');
       setTags([]);
       setCurrentTag('');
       
@@ -161,6 +164,23 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
                 value={assigneeId}
                 label="Исполнитель"
                 onChange={(e) => setAssigneeId(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Не назначен</em>
+                </MenuItem>
+                {users.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    {user.username}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Согласующий</InputLabel>
+              <Select
+                value={approverId}
+                label="Согласующий"
+                onChange={(e) => setApproverId(e.target.value)}
               >
                 <MenuItem value="">
                   <em>Не назначен</em>

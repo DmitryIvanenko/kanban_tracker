@@ -15,6 +15,7 @@ const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [telegram, setTelegram] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login, register } = useAuth();
@@ -35,8 +36,8 @@ const Login = () => {
         setError(result.error || 'Ошибка при входе');
       }
     } else {
-      console.log('Попытка регистрации с параметрами:', { username, password });
-      const result = await register({ username, password });
+      console.log('Попытка регистрации с параметрами:', { username, password, telegram });
+      const result = await register({ username, password, telegram });
       console.log('Результат регистрации:', result);
       if (result.success) {
         console.log('Регистрация успешна, выполняем вход...');
@@ -93,6 +94,20 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {!isLogin && (
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="telegram"
+                label="Telegram (@username или chat_id)"
+                name="telegram"
+                placeholder="@username или 123456789"
+                value={telegram}
+                onChange={(e) => setTelegram(e.target.value)}
+                helperText="Укажите ваш Telegram username (например, @myname) или chat_id (только цифры)"
+              />
+            )}
             {error && (
               <Typography color="error" align="center" sx={{ mt: 2 }}>
                 {error}
@@ -113,6 +128,7 @@ const Login = () => {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
+                  setTelegram(''); // Очищаем поле Telegram при переключении
                 }}
               >
                 {isLogin

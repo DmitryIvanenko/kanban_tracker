@@ -142,6 +142,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
         description: description.trim(),
         story_points: parseInt(storyPoints),
         assignee_id: assigneeId || null,
+        approver_id: approverId || null,
         tags: formattedTags
       };
       
