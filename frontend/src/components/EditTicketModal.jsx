@@ -14,7 +14,8 @@ import {
   Typography,
   Chip,
   Tooltip,
-  Divider
+  Divider,
+  Avatar
 } from '@mui/material';
 import { api, updateCard, deleteCard, getUsers, getColumn } from '../services/api';
 import CommentsSection from './CommentsSection';
@@ -24,6 +25,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [description, setDescription] = useState('');
   const [storyPoints, setStoryPoints] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [approverId, setApproverId] = useState('');
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,6 +41,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       setDescription(ticket.description || '');
       setStoryPoints(ticket.story_points?.toString() || '');
       setAssigneeId(ticket.assignee_id || '');
+      setApproverId(ticket.approver_id || '');
       console.log('EditTicketModal: теги тикета:', ticket.tags);
       console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
       console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
@@ -142,6 +145,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
         description: description.trim(),
         story_points: parseInt(storyPoints),
         assignee_id: assigneeId || null,
+        approver_id: approverId || null,
         tags: formattedTags
       };
       
@@ -187,7 +191,28 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   };
 
   const isDoneColumn = columnTitle === 'Done';
-  const editButton = isDoneColumn ? (
+  const canEdit = !isDoneColumn; // Можно редактировать во всех колонках кроме Done
+  
+  // Отладочная информация
+  console.log('EditTicketModal state:', {
+    columnTitle,
+    isDoneColumn,
+    canEdit,
+    isEditing,
+    ticket: ticket?.id,
+    approverId,
+    assigneeId
+  });
+  
+  // Дополнительная отладка для поля согласующего
+  console.log('Поле согласующего состояние:', {
+    'isDoneColumn': isDoneColumn,
+    'isEditing': isEditing,
+    'disabled (isDoneColumn || !isEditing)': isDoneColumn || !isEditing,
+    'Должно быть доступно': !isDoneColumn && isEditing
+  });
+  
+  const editButton = !canEdit ? (
     <Tooltip title="Тикет в колонке Done нельзя редактировать">
       <span>
         <Button 
@@ -239,7 +264,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
               fullWidth
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={!isEditing}
+              disabled={isDoneColumn || !isEditing}
               error={!!error && !title.trim()}
               helperText={error && !title.trim() ? error : ''}
             />
@@ -250,7 +275,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              disabled={!isEditing}
+              disabled={isDoneColumn || !isEditing}
             />
             <TextField
               label="Story Points"
@@ -258,7 +283,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
               fullWidth
               value={storyPoints}
               onChange={(e) => setStoryPoints(e.target.value)}
-              disabled={!isEditing}
+              disabled={isDoneColumn || !isEditing}
               error={!!error && (!storyPoints || isNaN(Number(storyPoints)))}
               helperText={error && (!storyPoints || isNaN(Number(storyPoints))) ? error : ''}
             />
@@ -268,7 +293,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 value={assigneeId}
                 label="Исполнитель"
                 onChange={(e) => setAssigneeId(e.target.value)}
-                disabled={!isEditing}
+                disabled={isDoneColumn || !isEditing}
               >
                 <MenuItem value="">
                   <em>Не назначен</em>
@@ -280,7 +305,35 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 ))}
               </Select>
             </FormControl>
-            {isEditing && (
+            <FormControl fullWidth>
+              <InputLabel>Согласующий</InputLabel>
+              <Select
+                value={approverId}
+                label="Согласующий"
+                onChange={(e) => {
+                  console.log('Согласующий изменен на:', e.target.value);
+                  setApproverId(e.target.value);
+                }}
+                disabled={isDoneColumn || !isEditing}
+                onClick={() => {
+                  console.log('Клик по полю согласующего. Состояние:', {
+                    isDoneColumn,
+                    isEditing,
+                    disabled: isDoneColumn || !isEditing
+                  });
+                }}
+              >
+                <MenuItem value="">
+                  <em>Не назначен</em>
+                </MenuItem>
+                {users.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    {user.username}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {isEditing && !isDoneColumn && (
               <Box>
                 <TextField
                   label="Добавить тег"
@@ -303,7 +356,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 </Box>
               </Box>
             )}
-            {!isEditing && tags && tags.length > 0 && (
+            {(!isEditing || isDoneColumn) && tags && tags.length > 0 && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   Теги:
@@ -318,6 +371,40 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                     />
                   ))}
                 </Box>
+              </Box>
+            )}
+            {!isEditing && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {ticket?.assignee && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Исполнитель:
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar sx={{ width: 32, height: 32, mr: 2 }}>
+                        {ticket.assignee.username?.[0]?.toUpperCase() || '?'}
+                      </Avatar>
+                      <Typography variant="body1">
+                        {ticket.assignee.username}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+                {ticket?.approver && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Согласующий:
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar sx={{ width: 32, height: 32, mr: 2 }}>
+                        {ticket.approver.username?.[0]?.toUpperCase() || '?'}
+                      </Avatar>
+                      <Typography variant="body1">
+                        {ticket.approver.username}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>

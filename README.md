@@ -34,6 +34,7 @@ cd kanban-tracker
 2. Запустите проект с помощью Docker Compose:
 ```bash
 docker-compose up --build
+
 ```
 
 3. Приложение будет доступно по следующим адресам:

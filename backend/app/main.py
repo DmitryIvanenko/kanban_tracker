@@ -4,16 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, date
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 from loguru import logger
 from . import models, schemas
 from .database import get_db, engine
 from .init_db import init_db
+
 from typing import List, Optional
 import logging
 import json
-from .auth import get_current_user, create_access_token, verify_password
+from .auth import get_current_user, create_access_token, verify_password, get_password_hash, oauth2_scheme
 import re
 from fastapi.responses import JSONResponse
 
@@ -22,19 +21,6 @@ models.Base.metadata.create_all(bind=engine)
 
 # Инициализируем базу данных
 init_db()
-
-# Настройки JWT
-SECRET_KEY = "your-secret-key"  # В продакшене использовать безопасный ключ
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Настройка хеширования паролей
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=12
-)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 app = FastAPI(
     title="Kanban Tracker API",
@@ -73,38 +59,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Неверные учетные данные",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = schemas.TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = db.query(models.User).filter(models.User.username == token_data.username).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 @app.post("/api/auth/register", response_model=schemas.User)
 async def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -206,10 +160,12 @@ async def get_columns(db: Session = Depends(get_db)):
         # Загружаем карточки для каждой колонки
         for column in columns:
             column.cards = db.query(models.Card).filter(models.Card.column_id == column.id).all()
-            # Загружаем информацию об исполнителях и тегах для каждой карточки
+            # Загружаем информацию об исполнителях, согласующих и тегах для каждой карточки
             for card in column.cards:
                 if card.assignee_id:
                     card.assignee = db.query(models.User).filter(models.User.id == card.assignee_id).first()
+                if card.approver_id:
+                    card.approver = db.query(models.User).filter(models.User.id == card.approver_id).first()
                 # Загружаем теги
                 card.tags = db.query(models.Tag).join(models.CardTag).filter(models.CardTag.card_id == card.id).all()
                 logger.info(f"Card {card.id} tags: {[tag.name for tag in card.tags]}")
@@ -237,6 +193,7 @@ async def get_columns(db: Session = Depends(get_db)):
                     "story_points": card.story_points,
                     "column_id": card.column_id,
                     "assignee_id": card.assignee_id,
+                    "approver_id": card.approver_id,
                     "created_at": card.created_at,
                     "updated_at": card.updated_at,
                     "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -248,6 +205,14 @@ async def get_columns(db: Session = Depends(get_db)):
                         "username": card.assignee.username,
                         "is_active": card.assignee.is_active,
                         "created_at": card.assignee.created_at
+                    }
+                
+                if card.approver:
+                    card_data["approver"] = {
+                        "id": card.approver.id,
+                        "username": card.approver.username,
+                        "is_active": card.approver.is_active,
+                        "created_at": card.approver.created_at
                     }
                 
                 column_data["cards"].append(card_data)
@@ -358,6 +323,14 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 raise HTTPException(status_code=404, detail="Исполнитель не найден")
             logger.info(f"Исполнитель найден: {assignee.username}")
 
+        # Проверяем существование согласующего, если он указан
+        approver = None
+        if card.approver_id:
+            approver = db.query(models.User).filter(models.User.id == card.approver_id).first()
+            if not approver:
+                raise HTTPException(status_code=404, detail="Согласующий не найден")
+            logger.info(f"Согласующий найден: {approver.username}")
+
         # Создаем новую карточку
         db_card = models.Card(
             title=card.title,
@@ -366,6 +339,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             story_points=card.story_points,
             column_id=card.column_id,
             assignee_id=card.assignee_id,
+            approver_id=card.approver_id,
             created_by=current_user.id
         )
         
@@ -651,6 +625,7 @@ async def update_card(
             "story_points": db_card.story_points,
             "column_id": db_card.column_id,
             "assignee_id": db_card.assignee_id,
+            "approver_id": db_card.approver_id,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -662,6 +637,14 @@ async def update_card(
                 "username": assignee.username,
                 "is_active": assignee.is_active,
                 "created_at": assignee.created_at
+            }
+
+        if db_card.approver:
+            response_data["approver"] = {
+                "id": db_card.approver.id,
+                "username": db_card.approver.username,
+                "is_active": db_card.approver.is_active,
+                "created_at": db_card.approver.created_at
             }
 
         logger.info(f"Успешно обновлена карточка {card_id}")
@@ -731,6 +714,7 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
             "story_points": card.story_points,
             "column_id": card.column_id,
             "assignee_id": card.assignee_id,
+            "approver_id": card.approver_id,
             "created_at": card.created_at,
             "updated_at": card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -742,6 +726,14 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
                 "username": card.assignee.username,
                 "is_active": card.assignee.is_active,
                 "created_at": card.assignee.created_at
+            }
+        
+        if card.approver:
+            response_data["approver"] = {
+                "id": card.approver.id,
+                "username": card.approver.username,
+                "is_active": card.approver.is_active,
+                "created_at": card.approver.created_at
             }
         
         logger.info(f"Отправляем ответ для карточки {card_id}: {response_data}")

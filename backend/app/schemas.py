@@ -116,6 +116,7 @@ class CardBase(BaseModel):
     story_points: Optional[int] = None
     column_id: int
     assignee_id: Optional[int] = None
+    approver_id: Optional[int] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -166,6 +167,7 @@ class CardUpdate(BaseModel):
     story_points: Optional[int] = None
     column_id: Optional[int] = None
     assignee_id: Optional[int] = None
+    approver_id: Optional[int] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -193,6 +195,7 @@ class Card(CardBase):
     created_at: datetime
     updated_at: datetime
     assignee: Optional[User] = None
+    approver: Optional[User] = None
     tags: List[Tag] = []
 
     class Config:
