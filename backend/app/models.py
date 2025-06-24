@@ -8,9 +8,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=True)
-    hashed_password = Column(String(100))
+    hashed_password = Column(String(100), nullable=False)
     telegram = Column(String(100), nullable=False)  # Telegram username или chat_id (обязательное поле)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -25,9 +25,9 @@ class Board(Base):
     __tablename__ = "boards"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), index=True)
+    title = Column(String(255), index=True, nullable=False)
     description = Column(Text)
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     owner = relationship("User", back_populates="boards")
@@ -37,10 +37,10 @@ class KanbanColumn(Base):
     __tablename__ = "columns"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), index=True)
-    position = Column(Integer)
+    title = Column(String(255), index=True, nullable=False)
+    position = Column(Integer, nullable=False)
     color = Column(String(7), default="#FFFFFF")
-    board_id = Column(Integer, ForeignKey("boards.id"))
+    board_id = Column(Integer, ForeignKey("boards.id"), nullable=False)
     
     board = relationship("Board", back_populates="columns")
     cards = relationship("Card", back_populates="column", cascade="all, delete-orphan")
@@ -49,7 +49,7 @@ class Tag(Base):
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, index=True)
+    name = Column(String(50), unique=True, index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     cards = relationship("Card", secondary="card_tags", back_populates="tags")
@@ -68,7 +68,7 @@ class Card(Base):
     description = Column(String)
     position = Column(Integer)
     story_points = Column(Integer)
-    column_id = Column(Integer, ForeignKey("columns.id"))
+    column_id = Column(Integer, ForeignKey("columns.id"), nullable=False)
     assignee_id = Column(Integer, ForeignKey("users.id"))
     approver_id = Column(Integer, ForeignKey("users.id"))
     created_by = Column(Integer, ForeignKey("users.id"))
@@ -87,8 +87,8 @@ class CardHistory(Base):
     __tablename__ = "card_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
-    action = Column(String(50))
+    card_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+    action = Column(String(50), nullable=False)
     details = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -98,10 +98,10 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
-    content = Column(String)
+    content = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    ticket_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    ticket_id = Column(Integer, ForeignKey("cards.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     ticket = relationship("Card", back_populates="comments")
     user = relationship("User", back_populates="comments") 

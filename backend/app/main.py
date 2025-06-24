@@ -18,10 +18,10 @@ from .telegram_bot import send_approver_notification, send_approver_change_notif
 import re
 from fastapi.responses import JSONResponse
 
-# Создаем таблицы в базе данных
-models.Base.metadata.create_all(bind=engine)
+# Создаем таблицы в базе данных (отключено - используем миграции)
+# models.Base.metadata.create_all(bind=engine)
 
-# Инициализируем базу данных
+# Инициализируем базу данных (создание данных, но не таблиц)
 init_db()
 
 # Настройки JWT
@@ -208,10 +208,12 @@ async def get_columns(db: Session = Depends(get_db)):
         # Загружаем карточки для каждой колонки
         for column in columns:
             column.cards = db.query(models.Card).filter(models.Card.column_id == column.id).all()
-            # Загружаем информацию об исполнителях и тегах для каждой карточки
+            # Загружаем информацию об исполнителях, согласующих и тегах для каждой карточки
             for card in column.cards:
                 if card.assignee_id:
                     card.assignee = db.query(models.User).filter(models.User.id == card.assignee_id).first()
+                if card.approver_id:
+                    card.approver = db.query(models.User).filter(models.User.id == card.approver_id).first()
                 # Загружаем теги
                 card.tags = db.query(models.Tag).join(models.CardTag).filter(models.CardTag.card_id == card.id).all()
                 logger.info(f"Card {card.id} tags: {[tag.name for tag in card.tags]}")
@@ -249,16 +251,20 @@ async def get_columns(db: Session = Depends(get_db)):
                     card_data["assignee"] = {
                         "id": card.assignee.id,
                         "username": card.assignee.username,
+                        "telegram": card.assignee.telegram,
                         "is_active": card.assignee.is_active,
-                        "created_at": card.assignee.created_at
+                        "created_at": card.assignee.created_at,
+                        "email": card.assignee.email
                     }
                 
                 if card.approver:
                     card_data["approver"] = {
                         "id": card.approver.id,
                         "username": card.approver.username,
+                        "telegram": card.approver.telegram,
                         "is_active": card.approver.is_active,
-                        "created_at": card.approver.created_at
+                        "created_at": card.approver.created_at,
+                        "email": card.approver.email
                     }
                 
                 column_data["cards"].append(card_data)
@@ -449,16 +455,20 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             response_data["assignee"] = {
                 "id": assignee.id,
                 "username": assignee.username,
+                "telegram": assignee.telegram,
                 "is_active": assignee.is_active,
-                "created_at": assignee.created_at
+                "created_at": assignee.created_at,
+                "email": assignee.email
             }
         
         if approver:
             response_data["approver"] = {
                 "id": approver.id,
                 "username": approver.username,
+                "telegram": approver.telegram,
                 "is_active": approver.is_active,
-                "created_at": approver.created_at
+                "created_at": approver.created_at,
+                "email": approver.email
             }
         
         return response_data
@@ -724,16 +734,20 @@ async def update_card(
             response_data["assignee"] = {
                 "id": assignee.id,
                 "username": assignee.username,
+                "telegram": assignee.telegram,
                 "is_active": assignee.is_active,
-                "created_at": assignee.created_at
+                "created_at": assignee.created_at,
+                "email": assignee.email
             }
 
         if approver:
             response_data["approver"] = {
                 "id": approver.id,
                 "username": approver.username,
+                "telegram": approver.telegram,
                 "is_active": approver.is_active,
-                "created_at": approver.created_at
+                "created_at": approver.created_at,
+                "email": approver.email
             }
 
         logger.info(f"Успешно обновлена карточка {card_id}")
@@ -813,16 +827,20 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
             response_data["assignee"] = {
                 "id": card.assignee.id,
                 "username": card.assignee.username,
+                "telegram": card.assignee.telegram,
                 "is_active": card.assignee.is_active,
-                "created_at": card.assignee.created_at
+                "created_at": card.assignee.created_at,
+                "email": card.assignee.email
             }
         
         if card.approver:
             response_data["approver"] = {
                 "id": card.approver.id,
                 "username": card.approver.username,
+                "telegram": card.approver.telegram,
                 "is_active": card.approver.is_active,
-                "created_at": card.approver.created_at
+                "created_at": card.approver.created_at,
+                "email": card.approver.email
             }
         
         logger.info(f"Отправляем ответ для карточки {card_id}: {response_data}")

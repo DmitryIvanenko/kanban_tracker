@@ -40,7 +40,12 @@ def send_telegram_message(chat_id: str, message: str) -> bool:
         return True
         
     except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка отправки Telegram сообщения пользователю {chat_id}: {e}")
+        try:
+            error_details = e.response.json() if hasattr(e, 'response') and e.response else "Нет деталей ошибки"
+            logger.error(f"Ошибка отправки Telegram сообщения пользователю {chat_id}: {e}")
+            logger.error(f"Детали ошибки Telegram API: {error_details}")
+        except:
+            logger.error(f"Ошибка отправки Telegram сообщения пользователю {chat_id}: {e}")
         return False
     except Exception as e:
         logger.error(f"Неожиданная ошибка при отправке Telegram сообщения: {e}")

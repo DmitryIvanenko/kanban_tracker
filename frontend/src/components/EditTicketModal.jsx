@@ -24,6 +24,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [description, setDescription] = useState('');
   const [storyPoints, setStoryPoints] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [approverId, setApproverId] = useState('');
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,6 +40,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       setDescription(ticket.description || '');
       setStoryPoints(ticket.story_points?.toString() || '');
       setAssigneeId(ticket.assignee_id || '');
+      setApproverId(ticket.approver_id || '');
       console.log('EditTicketModal: теги тикета:', ticket.tags);
       console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
       console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
@@ -281,6 +283,24 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 ))}
               </Select>
             </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Согласующий</InputLabel>
+              <Select
+                value={approverId}
+                label="Согласующий"
+                onChange={(e) => setApproverId(e.target.value)}
+                disabled={!isEditing}
+              >
+                <MenuItem value="">
+                  <em>Не назначен</em>
+                </MenuItem>
+                {users.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    {user.username}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             {isEditing && (
               <Box>
                 <TextField
@@ -318,6 +338,35 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       variant="outlined"
                     />
                   ))}
+                </Box>
+              </Box>
+            )}
+            {!isEditing && (ticket?.assignee || ticket?.approver) && (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Участники:
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {ticket?.assignee && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Исполнитель:
+                      </Typography>
+                      <Typography variant="body2">
+                        {ticket.assignee.username}
+                      </Typography>
+                    </Box>
+                  )}
+                  {ticket?.approver && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Согласующий:
+                      </Typography>
+                      <Typography variant="body2">
+                        {ticket.approver.username}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
             )}
