@@ -22,10 +22,10 @@ const Layout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static">
+      <AppBar position="static" sx={{ bgcolor: '#f1c232' }}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Kanban Tracker
+            CMD Tracker
           </Typography>
           <Button
             color="inherit"

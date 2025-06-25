@@ -17,6 +17,17 @@ const theme = createTheme({
     secondary: {
       main: '#dc004e',
     },
+    createButton: {
+      main: '#e87c25',
+      contrastText: '#ffffff',
+    },
+    tagColor: {
+      main: '#787e3f',
+      contrastText: '#ffffff',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
   },
 });
 

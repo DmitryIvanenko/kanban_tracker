@@ -154,8 +154,15 @@ const KanbanColumn = ({ column }) => {
                                   key={tag.id}
                                   label={tag.name}
                                   size="small"
-                                  color="secondary"
                                   variant="outlined"
+                                  sx={{
+                                    bgcolor: '#787e3f',
+                                    color: '#ffffff',
+                                    borderColor: '#787e3f',
+                                    '&:hover': {
+                                      bgcolor: '#6a7039',
+                                    }
+                                  }}
                                 />
                               ))}
                             </Box>

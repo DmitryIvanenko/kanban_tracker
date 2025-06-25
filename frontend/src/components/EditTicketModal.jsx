@@ -343,8 +343,15 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       key={tag}
                       label={tag}
                       onDelete={() => handleDeleteTag(tag)}
-                      color="primary"
                       variant="outlined"
+                      sx={{
+                        bgcolor: '#787e3f',
+                        color: '#ffffff',
+                        borderColor: '#787e3f',
+                        '&:hover': {
+                          bgcolor: '#6a7039',
+                        }
+                      }}
                     />
                   ))}
                 </Box>
@@ -360,8 +367,15 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                     <Chip
                       key={tag}
                       label={tag}
-                      color="primary"
                       variant="outlined"
+                      sx={{
+                        bgcolor: '#787e3f',
+                        color: '#ffffff',
+                        borderColor: '#787e3f',
+                        '&:hover': {
+                          bgcolor: '#6a7039',
+                        }
+                      }}
                     />
                   ))}
                 </Box>

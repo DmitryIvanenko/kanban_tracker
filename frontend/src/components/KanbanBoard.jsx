@@ -164,9 +164,14 @@ const KanbanBoard = () => {
           </Typography>
           <Button
             variant="contained"
-            color="primary"
             onClick={() => setIsCreateModalOpen(true)}
             startIcon={<AddIcon />}
+            sx={{ 
+              bgcolor: '#e87c25',
+              '&:hover': {
+                bgcolor: '#d66a1e',
+              }
+            }}
           >
             Создать тикет
           </Button>

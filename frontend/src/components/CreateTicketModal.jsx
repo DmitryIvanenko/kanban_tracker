@@ -233,8 +233,15 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
                     key={tag}
                     label={tag}
                     onDelete={() => handleDeleteTag(tag)}
-                    color="primary"
                     variant="outlined"
+                    sx={{
+                      bgcolor: '#787e3f',
+                      color: '#ffffff',
+                      borderColor: '#787e3f',
+                      '&:hover': {
+                        bgcolor: '#6a7039',
+                      }
+                    }}
                   />
                 ))}
               </Box>
