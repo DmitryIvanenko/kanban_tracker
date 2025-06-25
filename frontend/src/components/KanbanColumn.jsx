@@ -28,7 +28,7 @@ const getRealEstateTypeColor = (realEstateType) => {
   return colorMap[realEstateType] || '#f5f5f5'; // По умолчанию серый цвет
 };
 
-const KanbanColumn = ({ column }) => {
+const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
 
@@ -73,7 +73,7 @@ const KanbanColumn = ({ column }) => {
         {column.title}
       </Typography>
 
-      <Droppable droppableId={`col_${column.id}`}>
+      <Droppable droppableId={swimlanePrefix ? `${swimlanePrefix}-col_${column.id}` : `col_${column.id}`}>
         {(provided, snapshot) => (
           <Box
             ref={provided.innerRef}
