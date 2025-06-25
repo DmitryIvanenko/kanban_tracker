@@ -15,6 +15,12 @@ class RealEstateType(enum.Enum):
     HOTELS = "отели"
     OTHER_REAL_ESTATE = "иная недвижимость"
 
+class RCType(enum.Enum):
+    CENTR = "Центр"
+    UG = "Юг"
+    URAL = "Урал"
+    SIBIR = "Сибирь"
+
 class User(Base):
     __tablename__ = "users"
 

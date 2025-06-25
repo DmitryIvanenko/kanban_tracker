@@ -27,19 +27,26 @@ const KanbanBoard = () => {
 
   // Опции фильтра
   const filterOptions = [
-    'Показать все',
-    'Центр',
-    'Юг',
-    'Урал',
-    'Сибирь'
+    { value: 'Показать все', label: 'Показать все' },
+    { value: 'CENTR', label: 'Центр' },
+    { value: 'UG', label: 'Юг' },
+    { value: 'URAL', label: 'Урал' },
+    { value: 'SIBIR', label: 'Сибирь' }
   ];
+
+  // Функция для конвертации английской константы в русское значение
+  const convertConstantToRussian = (constant) => {
+    const option = filterOptions.find(opt => opt.value === constant);
+    return option ? option.label : constant;
+  };
 
   // Функция для фильтрации карточек
   const filterCards = (cards, filter) => {
     if (filter === 'Показать все') {
       return cards;
     }
-    return cards.filter(card => card.rc_zm === filter);
+    const russianValue = convertConstantToRussian(filter);
+    return cards.filter(card => card.rc_zm === russianValue);
   };
 
   // Функция для получения карточек не попавших в фильтр
@@ -47,7 +54,8 @@ const KanbanBoard = () => {
     if (filter === 'Показать все') {
       return [];
     }
-    return cards.filter(card => !card.rc_zm || card.rc_zm !== filter);
+    const russianValue = convertConstantToRussian(filter);
+    return cards.filter(card => !card.rc_zm || card.rc_zm !== russianValue);
   };
 
   // Создаем отфильтрованные колонки для каждого swimlane
@@ -233,8 +241,8 @@ const KanbanBoard = () => {
               startAdornment={<FilterAltIcon sx={{ mr: 1, color: 'action.active' }} />}
             >
               {filterOptions.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
                 </MenuItem>
               ))}
             </Select>
@@ -260,7 +268,7 @@ const KanbanBoard = () => {
         <Box sx={{ mb: hasFilteredOutCards ? 4 : 0 }}>
           {rcZmFilter !== 'Показать все' && (
             <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
-              Отфильтрованные тикеты ({rcZmFilter})
+              Отфильтрованные тикеты ({filterOptions.find(opt => opt.value === rcZmFilter)?.label || rcZmFilter})
             </Typography>
           )}
           <Box sx={{ display: 'flex', gap: 3, overflowX: 'auto', pb: 2 }}>

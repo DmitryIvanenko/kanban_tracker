@@ -33,10 +33,10 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
 
   // Опции для РЦ полей
   const rcOptions = [
-    { value: 'Центр', label: 'Центр' },
-    { value: 'Юг', label: 'Юг' },
-    { value: 'Урал', label: 'Урал' },
-    { value: 'Сибирь', label: 'Сибирь' }
+    { value: 'CENTR', label: 'Центр' },
+    { value: 'UG', label: 'Юг' },
+    { value: 'URAL', label: 'Урал' },
+    { value: 'SIBIR', label: 'Сибирь' }
   ];
 
   useEffect(() => {

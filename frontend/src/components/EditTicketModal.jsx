@@ -39,23 +39,37 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
 
   // Опции для РЦ полей
   const rcOptions = [
-    { value: 'Центр', label: 'Центр' },
-    { value: 'Юг', label: 'Юг' },
-    { value: 'Урал', label: 'Урал' },
-    { value: 'Сибирь', label: 'Сибирь' }
+    { value: 'CENTR', label: 'Центр' },
+    { value: 'UG', label: 'Юг' },
+    { value: 'URAL', label: 'Урал' },
+    { value: 'SIBIR', label: 'Сибирь' }
   ];
+
+  // Функция для конвертации русского значения в английскую константу
+  const convertRussianToConstant = (russianValue) => {
+    const option = rcOptions.find(opt => opt.label === russianValue);
+    return option ? option.value : '';
+  };
+
+  // Функция для конвертации русского значения типа недвижимости в английскую константу
+  const convertRealEstateTypeToConstant = (russianValue) => {
+    const type = realEstateTypes.find(type => type.label === russianValue);
+    return type ? type.value : '';
+  };
 
   useEffect(() => {
     if (ticket) {
       console.log('EditTicketModal: получен тикет:', ticket);
+      console.log('EditTicketModal: rc_mk:', ticket.rc_mk);
+      console.log('EditTicketModal: rc_zm:', ticket.rc_zm);
       setTitle(ticket.title);
       setDescription(ticket.description || '');
       setStoryPoints(ticket.story_points?.toString() || '');
       setAssigneeId(ticket.assignee_id || '');
       setApproverId(ticket.approver_id || '');
-      setRealEstateType(ticket.real_estate_type || '');
-      setRcMk(ticket.rc_mk || '');
-      setRcZm(ticket.rc_zm || '');
+      // realEstateType будет установлен в отдельном useEffect после загрузки realEstateTypes
+      setRcMk(convertRussianToConstant(ticket.rc_mk) || '');
+      setRcZm(convertRussianToConstant(ticket.rc_zm) || '');
       console.log('EditTicketModal: теги тикета:', ticket.tags);
       console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
       console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
@@ -108,6 +122,13 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
     };
     fetchColumnTitle();
   }, [ticket]);
+
+  // Инициализация realEstateType после загрузки realEstateTypes
+  useEffect(() => {
+    if (ticket && realEstateTypes.length > 0) {
+      setRealEstateType(convertRealEstateTypeToConstant(ticket.real_estate_type) || '');
+    }
+  }, [ticket, realEstateTypes]);
 
   const handleTagKeyPress = (e) => {
     if (e.key === 'Enter') {
@@ -471,7 +492,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                         РЦ МК:
                       </Typography>
                       <Typography variant="body2">
-                        {ticket.rc_mk}
+                        {rcOptions.find(option => option.label === ticket.rc_mk)?.label || ticket.rc_mk}
                       </Typography>
                     </Box>
                   )}
@@ -481,7 +502,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                         РЦ ЗМ:
                       </Typography>
                       <Typography variant="body2">
-                        {ticket.rc_zm}
+                        {rcOptions.find(option => option.label === ticket.rc_zm)?.label || ticket.rc_zm}
                       </Typography>
                     </Box>
                   )}

@@ -243,6 +243,8 @@ async def get_columns(db: Session = Depends(get_db)):
                     "assignee_id": card.assignee_id,
                     "approver_id": card.approver_id,
                     "real_estate_type": card.real_estate_type,
+                    "rc_mk": card.rc_mk,
+                    "rc_zm": card.rc_zm,
                     "created_at": card.created_at,
                     "updated_at": card.updated_at,
                     "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
@@ -351,6 +353,8 @@ def update_card_tags(db: Session, card: models.Card, tag_names: List[str]):
 async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     try:
         logger.info(f"Начало создания тикета. Данные: {card.dict()}")
+        logger.info(f"Поля РЦ МК: {card.rc_mk} (тип: {type(card.rc_mk)})")
+        logger.info(f"Поля РЦ ЗМ: {card.rc_zm} (тип: {type(card.rc_zm)})")
         
         # Проверяем существование колонки
         column = db.query(models.KanbanColumn).filter(models.KanbanColumn.id == card.column_id).first()
@@ -386,6 +390,27 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 logger.error(f"Неизвестный тип недвижимости: {card.real_estate_type}")
                 raise HTTPException(status_code=422, detail=f"Неизвестный тип недвижимости: {card.real_estate_type}")
 
+        # Конвертируем строковые значения РЦ в enum
+        rc_mk_value = None
+        if card.rc_mk:
+            try:
+                rc_mk_enum = models.RCType[card.rc_mk]
+                rc_mk_value = rc_mk_enum.value
+                logger.info(f"РЦ МК конвертирован: {card.rc_mk} -> {rc_mk_value}")
+            except KeyError:
+                logger.error(f"Неизвестный РЦ МК: {card.rc_mk}")
+                raise HTTPException(status_code=422, detail=f"Неизвестный РЦ МК: {card.rc_mk}")
+
+        rc_zm_value = None
+        if card.rc_zm:
+            try:
+                rc_zm_enum = models.RCType[card.rc_zm]
+                rc_zm_value = rc_zm_enum.value
+                logger.info(f"РЦ ЗМ конвертирован: {card.rc_zm} -> {rc_zm_value}")
+            except KeyError:
+                logger.error(f"Неизвестный РЦ ЗМ: {card.rc_zm}")
+                raise HTTPException(status_code=422, detail=f"Неизвестный РЦ ЗМ: {card.rc_zm}")
+
         # Создаем новую карточку
         db_card = models.Card(
             title=card.title,
@@ -396,6 +421,8 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             assignee_id=card.assignee_id,
             approver_id=card.approver_id,
             real_estate_type=real_estate_type_value,  # Сохраняем строковое значение
+            rc_mk=rc_mk_value,  # Сохраняем строковое значение РЦ МК
+            rc_zm=rc_zm_value,  # Сохраняем строковое значение РЦ ЗМ
             created_by=current_user.id
         )
         
@@ -423,6 +450,8 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "column_id": card.column_id,
                 "assignee_id": card.assignee_id,
                 "real_estate_type": card.real_estate_type,
+                "rc_mk": card.rc_mk,
+                "rc_zm": card.rc_zm,
                 "tags": card.tags
             })
         )
@@ -456,6 +485,8 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
             "assignee_id": db_card.assignee_id,
             "approver_id": db_card.approver_id,
             "real_estate_type": real_estate_type_value,
+            "rc_mk": rc_mk_value,
+            "rc_zm": rc_zm_value,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -553,6 +584,16 @@ async def get_real_estate_types():
         "types": [
             {"value": member.name, "label": member.value}
             for member in models.RealEstateType
+        ]
+    }
+
+@app.get("/api/rc-types")
+async def get_rc_types():
+    """Получить все доступные типы РЦ"""
+    return {
+        "types": [
+            {"value": member.name, "label": member.value}
+            for member in models.RCType
         ]
     }
 
@@ -696,12 +737,48 @@ async def update_card(
             except KeyError:
                 logger.error(f"Неизвестный тип недвижимости: {real_estate_type_constant}")
                 raise HTTPException(status_code=400, detail=f"Неизвестный тип недвижимости: {real_estate_type_constant}")
+
+        # Конвертируем РЦ МК если он есть
+        rc_mk_value = None
+        if 'rc_mk' in update_data and update_data['rc_mk']:
+            rc_mk_constant = update_data['rc_mk']
+            logger.info(f"Получен РЦ МК: {rc_mk_constant}")
+            
+            try:
+                enum_member = models.RCType[rc_mk_constant]
+                rc_mk_value = enum_member.value
+                logger.info(f"Конвертирован РЦ МК: {rc_mk_constant} -> {rc_mk_value}")
+            except KeyError:
+                logger.error(f"Неизвестный РЦ МК: {rc_mk_constant}")
+                raise HTTPException(status_code=400, detail=f"Неизвестный РЦ МК: {rc_mk_constant}")
+
+        # Конвертируем РЦ ЗМ если он есть
+        rc_zm_value = None
+        if 'rc_zm' in update_data and update_data['rc_zm']:
+            rc_zm_constant = update_data['rc_zm']
+            logger.info(f"Получен РЦ ЗМ: {rc_zm_constant}")
+            
+            try:
+                enum_member = models.RCType[rc_zm_constant]
+                rc_zm_value = enum_member.value
+                logger.info(f"Конвертирован РЦ ЗМ: {rc_zm_constant} -> {rc_zm_value}")
+            except KeyError:
+                logger.error(f"Неизвестный РЦ ЗМ: {rc_zm_constant}")
+                raise HTTPException(status_code=400, detail=f"Неизвестный РЦ ЗМ: {rc_zm_constant}")
         
         for key, value in update_data.items():
             if key == 'real_estate_type':
                 # Используем конвертированное значение для типа недвижимости
                 if real_estate_type_value is not None:
                     setattr(db_card, key, real_estate_type_value)
+            elif key == 'rc_mk':
+                # Используем конвертированное значение для РЦ МК
+                if rc_mk_value is not None:
+                    setattr(db_card, key, rc_mk_value)
+            elif key == 'rc_zm':
+                # Используем конвертированное значение для РЦ ЗМ
+                if rc_zm_value is not None:
+                    setattr(db_card, key, rc_zm_value)
             elif key != 'tags':  # Исключаем теги из общего обновления
                 setattr(db_card, key, value)
 
@@ -770,6 +847,8 @@ async def update_card(
             "assignee_id": db_card.assignee_id,
             "approver_id": db_card.approver_id,
             "real_estate_type": real_estate_type_value,
+            "rc_mk": rc_mk_value,
+            "rc_zm": rc_zm_value,
             "created_at": db_card.created_at,
             "updated_at": db_card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in db_card.tags]
@@ -863,6 +942,9 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
             "column_id": card.column_id,
             "assignee_id": card.assignee_id,
             "approver_id": card.approver_id,
+            "real_estate_type": card.real_estate_type,
+            "rc_mk": card.rc_mk,
+            "rc_zm": card.rc_zm,
             "created_at": card.created_at,
             "updated_at": card.updated_at,
             "tags": [{"id": tag.id, "name": tag.name, "created_at": tag.created_at} for tag in card.tags]
