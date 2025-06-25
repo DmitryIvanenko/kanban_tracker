@@ -94,6 +94,20 @@ class Card(Base):
         'иная недвижимость',
         name='real_estate_type_enum'
     ), nullable=True, comment="Тип недвижимости")
+    rc_mk = Column(Enum(
+        'Центр',
+        'Юг',
+        'Урал',
+        'Сибирь',
+        name='rc_mk_enum'
+    ), nullable=True, comment="РЦ МК")
+    rc_zm = Column(Enum(
+        'Центр',
+        'Юг',
+        'Урал',
+        'Сибирь',
+        name='rc_zm_enum'
+    ), nullable=True, comment="РЦ ЗМ")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

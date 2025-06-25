@@ -28,6 +28,16 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const [currentTag, setCurrentTag] = useState('');
   const [realEstateType, setRealEstateType] = useState('');
   const [realEstateTypes, setRealEstateTypes] = useState([]);
+  const [rcMk, setRcMk] = useState('');
+  const [rcZm, setRcZm] = useState('');
+
+  // Опции для РЦ полей
+  const rcOptions = [
+    { value: 'Центр', label: 'Центр' },
+    { value: 'Юг', label: 'Юг' },
+    { value: 'Урал', label: 'Урал' },
+    { value: 'Сибирь', label: 'Сибирь' }
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,6 +103,8 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       assignee_id: assigneeId || null,
       approver_id: approverId || null,
       real_estate_type: realEstateType || null,
+      rc_mk: rcMk || null,
+      rc_zm: rcZm || null,
       tags
     };
 
@@ -110,6 +122,8 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       setAssigneeId('');
       setApproverId('');
       setRealEstateType('');
+      setRcMk('');
+      setRcZm('');
       setTags([]);
       setCurrentTag('');
       
@@ -214,6 +228,40 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
                 {realEstateTypes.map((type) => (
                   <MenuItem key={type.value} value={type.value}>
                     {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>РЦ МК</InputLabel>
+              <Select
+                value={rcMk}
+                label="РЦ МК"
+                onChange={(e) => setRcMk(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {rcOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>РЦ ЗМ</InputLabel>
+              <Select
+                value={rcZm}
+                label="РЦ ЗМ"
+                onChange={(e) => setRcZm(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {rcOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
                   </MenuItem>
                 ))}
               </Select>

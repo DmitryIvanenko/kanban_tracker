@@ -132,6 +132,8 @@ class CardBase(BaseModel):
     assignee_id: Optional[int] = None
     approver_id: Optional[int] = None
     real_estate_type: Optional[str] = None
+    rc_mk: Optional[str] = None
+    rc_zm: Optional[str] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')
@@ -184,6 +186,8 @@ class CardUpdate(BaseModel):
     assignee_id: Optional[int] = None
     approver_id: Optional[int] = None
     real_estate_type: Optional[str] = None
+    rc_mk: Optional[str] = None
+    rc_zm: Optional[str] = None
     tags: Optional[List[str]] = None
 
     @validator('tags')

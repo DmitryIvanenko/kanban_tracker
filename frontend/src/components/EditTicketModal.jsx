@@ -34,6 +34,16 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [realEstateType, setRealEstateType] = useState('');
   const [realEstateTypes, setRealEstateTypes] = useState([]);
+  const [rcMk, setRcMk] = useState('');
+  const [rcZm, setRcZm] = useState('');
+
+  // Опции для РЦ полей
+  const rcOptions = [
+    { value: 'Центр', label: 'Центр' },
+    { value: 'Юг', label: 'Юг' },
+    { value: 'Урал', label: 'Урал' },
+    { value: 'Сибирь', label: 'Сибирь' }
+  ];
 
   useEffect(() => {
     if (ticket) {
@@ -44,6 +54,8 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       setAssigneeId(ticket.assignee_id || '');
       setApproverId(ticket.approver_id || '');
       setRealEstateType(ticket.real_estate_type || '');
+      setRcMk(ticket.rc_mk || '');
+      setRcZm(ticket.rc_zm || '');
       console.log('EditTicketModal: теги тикета:', ticket.tags);
       console.log('EditTicketModal: тип тегов:', typeof ticket.tags);
       console.log('EditTicketModal: теги тикета (JSON):', JSON.stringify(ticket.tags));
@@ -153,6 +165,8 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
         assignee_id: assigneeId || null,
         approver_id: approverId || null,
         real_estate_type: realEstateType || null,
+        rc_mk: rcMk || null,
+        rc_zm: rcZm || null,
         tags: formattedTags
       };
       
@@ -327,6 +341,42 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 ))}
               </Select>
             </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>РЦ МК</InputLabel>
+              <Select
+                value={rcMk}
+                label="РЦ МК"
+                onChange={(e) => setRcMk(e.target.value)}
+                disabled={!isEditing}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {rcOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>РЦ ЗМ</InputLabel>
+              <Select
+                value={rcZm}
+                label="РЦ ЗМ"
+                onChange={(e) => setRcZm(e.target.value)}
+                disabled={!isEditing}
+              >
+                <MenuItem value="">
+                  <em>Не выбран</em>
+                </MenuItem>
+                {rcOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             {isEditing && (
               <Box>
                 <TextField
@@ -379,7 +429,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                 </Box>
               </Box>
             )}
-            {!isEditing && (ticket?.assignee || ticket?.approver || ticket?.real_estate_type) && (
+            {!isEditing && (ticket?.assignee || ticket?.approver || ticket?.real_estate_type || ticket?.rc_mk || ticket?.rc_zm) && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   Дополнительная информация:
@@ -412,6 +462,26 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       </Typography>
                       <Typography variant="body2">
                         {realEstateTypes.find(type => type.value === ticket.real_estate_type)?.label || ticket.real_estate_type}
+                      </Typography>
+                    </Box>
+                  )}
+                  {ticket?.rc_mk && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        РЦ МК:
+                      </Typography>
+                      <Typography variant="body2">
+                        {ticket.rc_mk}
+                      </Typography>
+                    </Box>
+                  )}
+                  {ticket?.rc_zm && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        РЦ ЗМ:
+                      </Typography>
+                      <Typography variant="body2">
+                        {ticket.rc_zm}
                       </Typography>
                     </Box>
                   )}
