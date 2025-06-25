@@ -22,31 +22,31 @@ const Layout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ bgcolor: '#f1c232' }}>
+      <AppBar position="static" sx={{ bgcolor: '#FEE600' }}>
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: '#000000' }}>
             CMD Tracker
           </Typography>
           <Button
             color="inherit"
             onClick={() => navigate('/')}
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, color: '#000000' }}
           >
             Доска
           </Button>
           <Button
             color="inherit"
             onClick={() => navigate('/statistics')}
-            sx={{ mr: 2 }}
+            sx={{ mr: 2, color: '#000000' }}
           >
             Статистика
           </Button>
           {user && (
-            <Typography variant="body1" sx={{ mr: 2, color: 'inherit' }}>
+            <Typography variant="body1" sx={{ mr: 2, color: '#000000' }}>
               {user.username}
             </Typography>
           )}
-          <Button color="inherit" onClick={handleLogout}>
+          <Button color="inherit" onClick={handleLogout} sx={{ color: '#000000' }}>
             Выйти
           </Button>
         </Toolbar>

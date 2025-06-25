@@ -158,18 +158,16 @@ const KanbanBoard = () => {
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            Канбан Доска
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
           <Button
             variant="contained"
             onClick={() => setIsCreateModalOpen(true)}
             startIcon={<AddIcon />}
             sx={{ 
-              bgcolor: '#e87c25',
+              bgcolor: '#fadfa8',
+              color: '#000000',
               '&:hover': {
-                bgcolor: '#d66a1e',
+                bgcolor: '#f0d495',
               }
             }}
           >

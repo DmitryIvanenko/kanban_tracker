@@ -345,11 +345,10 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       onDelete={() => handleDeleteTag(tag)}
                       variant="outlined"
                       sx={{
-                        bgcolor: '#787e3f',
-                        color: '#ffffff',
+                        color: '#787e3f',
                         borderColor: '#787e3f',
                         '&:hover': {
-                          bgcolor: '#6a7039',
+                          bgcolor: 'rgba(120, 126, 63, 0.08)',
                         }
                       }}
                     />
@@ -369,11 +368,10 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
                       label={tag}
                       variant="outlined"
                       sx={{
-                        bgcolor: '#787e3f',
-                        color: '#ffffff',
+                        color: '#787e3f',
                         borderColor: '#787e3f',
                         '&:hover': {
-                          bgcolor: '#6a7039',
+                          bgcolor: 'rgba(120, 126, 63, 0.08)',
                         }
                       }}
                     />

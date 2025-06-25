@@ -66,7 +66,7 @@ const KanbanColumn = ({ column }) => {
         p: 2,
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: 'background.paper'
+        bgcolor: '#eae6e3'
       }}
     >
       <Typography variant="h6" gutterBottom>
@@ -126,7 +126,13 @@ const KanbanColumn = ({ column }) => {
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {card.assignee && (
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Avatar sx={{ width: 24, height: 24, mr: 1 }}>
+                                <Avatar sx={{ 
+                                  width: 24, 
+                                  height: 24, 
+                                  mr: 1,
+                                  bgcolor: '#6a329f',
+                                  color: '#ffffff'
+                                }}>
                                   {typeof card.assignee === 'string' 
                                     ? card.assignee[0]?.toUpperCase() || '?' 
                                     : card.assignee.username?.[0]?.toUpperCase() || '?'
@@ -156,11 +162,10 @@ const KanbanColumn = ({ column }) => {
                                   size="small"
                                   variant="outlined"
                                   sx={{
-                                    bgcolor: '#787e3f',
-                                    color: '#ffffff',
+                                    color: '#787e3f',
                                     borderColor: '#787e3f',
                                     '&:hover': {
-                                      bgcolor: '#6a7039',
+                                      bgcolor: 'rgba(120, 126, 63, 0.08)',
                                     }
                                   }}
                                 />

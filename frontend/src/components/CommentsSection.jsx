@@ -122,7 +122,12 @@ const CommentsSection = ({ cardId }) => {
           {comments.map((comment, index) => (
             <Box key={comment.id}>
               <Box sx={{ display: 'flex', gap: 2, py: 2 }}>
-                <Avatar sx={{ width: 32, height: 32 }}>
+                <Avatar sx={{ 
+                  width: 32, 
+                  height: 32,
+                  bgcolor: '#6a329f',
+                  color: '#ffffff'
+                }}>
                   {comment.user?.username?.[0]?.toUpperCase() || '?'}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
