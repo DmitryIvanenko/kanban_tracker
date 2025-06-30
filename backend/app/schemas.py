@@ -242,6 +242,7 @@ class ColumnBase(BaseModel):
     title: str
     position: int
     color: str
+    wip_limit: Optional[int] = None
 
 class ColumnCreate(ColumnBase):
     pass
@@ -252,6 +253,16 @@ class Column(ColumnBase):
 
     class Config:
         from_attributes = True
+
+class WipLimitUpdate(BaseModel):
+    column_id: int
+    wip_limit: Optional[int] = None
+
+    @validator('wip_limit')
+    def validate_wip_limit(cls, v):
+        if v is not None and v < 1:
+            raise ValueError('WIP лимит должен быть больше 0')
+        return v
 
 class BoardBase(BaseModel):
     title: str

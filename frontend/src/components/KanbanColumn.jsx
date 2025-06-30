@@ -46,9 +46,11 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
   };
 
   const handleEditSuccess = async (updatedCard) => {
+    console.log('🔧 KanbanColumn handleEditSuccess вызван:', updatedCard);
     setIsEditModalOpen(false);
     setSelectedCard(null);
     // Обновляем данные, перезагружая страницу
+    console.log('🔧 KanbanColumn: вызываю window.location.reload()');
     window.location.reload();
   };
 
@@ -69,9 +71,24 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
         bgcolor: '#eae6e3'
       }}
     >
-      <Typography variant="h6" gutterBottom>
-        {column.title}
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">
+          {column.title}
+        </Typography>
+        {column.wip_limit && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip
+              label={`${column.cards_count || cards.length}/${column.wip_limit}`}
+              size="small"
+              color={
+                (column.cards_count || cards.length) >= column.wip_limit ? 'error' :
+                (column.cards_count || cards.length) >= column.wip_limit * 0.8 ? 'warning' : 'success'
+              }
+              sx={{ fontWeight: 'bold' }}
+            />
+          </Box>
+        )}
+      </Box>
 
       <Droppable droppableId={swimlanePrefix ? `${swimlanePrefix}-col_${column.id}` : `col_${column.id}`}>
         {(provided, snapshot) => (

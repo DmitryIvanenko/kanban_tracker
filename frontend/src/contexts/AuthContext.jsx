@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getCurrentUser, login as apiLogin, register as apiRegister } from '../services/api';
 
 const AuthContext = createContext();
@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     try {
       const response = await apiLogin({ username, password });
       
@@ -55,9 +55,9 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.detail || 'Ошибка при входе в систему' 
       };
     }
-  };
+  }, []);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     try {
       const response = await apiRegister(userData);
       return { success: true, data: response };
@@ -68,31 +68,32 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.detail || 'Ошибка при регистрации' 
       };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setUser(null);
-  };
+  }, []);
 
   // Функции для проверки ролей
-  const isAdmin = () => {
+  const isAdmin = useCallback(() => {
     return user?.role === 'ADMIN';
-  };
+  }, [user]);
 
-  const isCurator = () => {
+  const isCurator = useCallback(() => {
     return user?.role === 'CURATOR';
-  };
+  }, [user]);
 
-  const isCuratorOrAdmin = () => {
+  const isCuratorOrAdmin = useCallback(() => {
     return user?.role === 'CURATOR' || user?.role === 'ADMIN';
-  };
+  }, [user]);
 
-  const hasRole = (requiredRole) => {
+  const hasRole = useCallback((requiredRole) => {
     return user?.role === requiredRole;
-  };
+  }, [user]);
 
-  const value = {
+  // Мемоизируем value объект для предотвращения пересоздания контекста
+  const value = useMemo(() => ({
     user,
     loading,
     login,
@@ -104,7 +105,7 @@ export const AuthProvider = ({ children }) => {
     isCurator,
     isCuratorOrAdmin,
     hasRole
-  };
+  }), [user, loading, login, register, logout, isAdmin, isCurator, isCuratorOrAdmin, hasRole]);
 
   if (loading) {
     return <div>Загрузка...</div>;

@@ -64,6 +64,7 @@ class KanbanColumn(Base):
     position = Column(Integer, nullable=False)
     color = Column(String(7), default="#FFFFFF")
     board_id = Column(Integer, ForeignKey("boards.id"), nullable=False)
+    wip_limit = Column(Integer, nullable=True, comment="WIP лимит для колонки (Work In Progress)")
     
     board = relationship("Board", back_populates="columns")
     cards = relationship("Card", back_populates="column", cascade="all, delete-orphan")

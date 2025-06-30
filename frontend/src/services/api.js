@@ -187,6 +187,17 @@ export const getAvailableRoles = async () => {
   return response.data;
 };
 
+// Кураторские функции для управления WIP лимитами
+export const getCuratorColumns = async () => {
+  const response = await api.get('/api/curator/columns');
+  return response.data;
+};
+
+export const updateWipLimit = async (columnId, wipData) => {
+  const response = await api.put(`/api/curator/columns/${columnId}/wip-limit`, wipData);
+  return response.data;
+};
+
 // Алиас для updateCard (на случай если где-то используется editCard)
 export const editCard = updateCard;
 

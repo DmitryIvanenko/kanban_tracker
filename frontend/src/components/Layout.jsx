@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -10,15 +10,15 @@ import {
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
-const Layout = ({ children }) => {
+const Layout = React.memo(({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, user, isAdmin } = useAuth();
+  const { logout, user, isAdmin, isCuratorOrAdmin } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -34,6 +34,15 @@ const Layout = ({ children }) => {
           >
             Доска
           </Button>
+          {isCuratorOrAdmin() && (
+            <Button
+              color="inherit"
+              onClick={() => navigate('/curator')}
+              sx={{ mr: 2, color: '#000000' }}
+            >
+              Кураторская
+            </Button>
+          )}
           {isAdmin() && (
             <Button
               color="inherit"
@@ -65,6 +74,6 @@ const Layout = ({ children }) => {
       </Container>
     </Box>
   );
-};
+});
 
 export default Layout; 

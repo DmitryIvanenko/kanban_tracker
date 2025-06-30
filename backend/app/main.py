@@ -233,6 +233,8 @@ async def get_columns(db: Session = Depends(get_db)):
                 "title": column.title,
                 "position": column.position,
                 "color": column.color,
+                "wip_limit": column.wip_limit,
+                "cards_count": len(column.cards),
                 "cards": []
             }
             
@@ -259,6 +261,7 @@ async def get_columns(db: Session = Depends(get_db)):
                         "id": card.assignee.id,
                         "username": card.assignee.username,
                         "telegram": card.assignee.telegram,
+                        "role": card.assignee.role,
                         "is_active": card.assignee.is_active,
                         "created_at": card.assignee.created_at,
                         "email": card.assignee.email
@@ -269,6 +272,7 @@ async def get_columns(db: Session = Depends(get_db)):
                         "id": card.approver.id,
                         "username": card.approver.username,
                         "telegram": card.approver.telegram,
+                        "role": card.approver.role,
                         "is_active": card.approver.is_active,
                         "created_at": card.approver.created_at,
                         "email": card.approver.email
@@ -365,6 +369,13 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
         if not column:
             raise HTTPException(status_code=404, detail="Колонка не найдена")
         logger.info(f"Колонка найдена: {column.id}")
+
+        # Проверяем WIP лимит для колонки
+        if not check_wip_limit(db, card.column_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Исчерпан WIP лимит задач в колонке '{column.title}'"
+            )
 
         # Проверяем существование исполнителя, если он указан
         assignee = None
@@ -501,6 +512,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "id": assignee.id,
                 "username": assignee.username,
                 "telegram": assignee.telegram,
+                "role": assignee.role,
                 "is_active": assignee.is_active,
                 "created_at": assignee.created_at,
                 "email": assignee.email
@@ -511,6 +523,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 "id": approver.id,
                 "username": approver.username,
                 "telegram": approver.telegram,
+                "role": approver.role,
                 "is_active": approver.is_active,
                 "created_at": approver.created_at,
                 "email": approver.email
@@ -541,6 +554,17 @@ async def move_card(
     target_column = db.query(models.KanbanColumn).filter(models.KanbanColumn.id == move_data.to_column).first()
     if not target_column:
         raise HTTPException(status_code=404, detail="Колонка назначения не найдена")
+    
+    # Если карточка не перемещается (остается в той же колонке), пропускаем проверку WIP лимита
+    if card.column_id != move_data.to_column:
+        # Проверяем WIP лимит только при перемещении в другую колонку
+        if not check_wip_limit(db, move_data.to_column):
+            # Получаем название колонки для ошибки
+            column_name = target_column.title
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Исчерпан WIP лимит задач в колонке '{column_name}'"
+            )
     
     # Создаем запись в истории
     history_entry = models.CardHistory(
@@ -863,6 +887,7 @@ async def update_card(
                 "id": assignee.id,
                 "username": assignee.username,
                 "telegram": assignee.telegram,
+                "role": assignee.role,
                 "is_active": assignee.is_active,
                 "created_at": assignee.created_at,
                 "email": assignee.email
@@ -873,6 +898,7 @@ async def update_card(
                 "id": approver.id,
                 "username": approver.username,
                 "telegram": approver.telegram,
+                "role": approver.role,
                 "is_active": approver.is_active,
                 "created_at": approver.created_at,
                 "email": approver.email
@@ -959,6 +985,7 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
                 "id": card.assignee.id,
                 "username": card.assignee.username,
                 "telegram": card.assignee.telegram,
+                "role": card.assignee.role,
                 "is_active": card.assignee.is_active,
                 "created_at": card.assignee.created_at,
                 "email": card.assignee.email
@@ -969,6 +996,7 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
                 "id": card.approver.id,
                 "username": card.approver.username,
                 "telegram": card.approver.telegram,
+                "role": card.approver.role,
                 "is_active": card.approver.is_active,
                 "created_at": card.approver.created_at,
                 "email": card.approver.email
@@ -1133,6 +1161,113 @@ async def get_available_roles(current_user: models.User = Depends(require_admin_
             {"value": "ADMIN", "label": "Администратор"}
         ]
     }
+
+# API endpoints для управления WIP лимитами (только для curator и admin)
+@app.get("/api/curator/columns")
+async def get_columns_for_curator(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_curator_or_admin_role)
+):
+    """Получить список колонок для кураторской страницы"""
+    try:
+        columns = db.query(models.KanbanColumn).order_by(models.KanbanColumn.position).all()
+        
+        result = []
+        for column in columns:
+            cards_count = db.query(models.Card).filter(models.Card.column_id == column.id).count()
+            result.append({
+                "id": column.id,
+                "title": column.title,
+                "position": column.position,
+                "color": column.color,
+                "wip_limit": column.wip_limit,
+                "cards_count": cards_count
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка при получении колонок для куратора: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при получении колонок: {str(e)}"
+        )
+
+@app.put("/api/curator/columns/{column_id}/wip-limit")
+async def update_wip_limit(
+    column_id: int,
+    wip_data: schemas.WipLimitUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_curator_or_admin_role)
+):
+    """Обновить WIP лимит колонки (только для curator и admin)"""
+    try:
+        # Проверяем, что колонка существует
+        column = db.query(models.KanbanColumn).filter(models.KanbanColumn.id == column_id).first()
+        if not column:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Колонка не найдена"
+            )
+        
+        # Проверяем, что ID в URL совпадает с ID в теле запроса
+        if column_id != wip_data.column_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ID колонки в URL не совпадает с ID в теле запроса"
+            )
+        
+        # Обновляем WIP лимит
+        old_limit = column.wip_limit
+        column.wip_limit = wip_data.wip_limit
+        db.commit()
+        db.refresh(column)
+        
+        # Получаем текущее количество карточек в колонке
+        cards_count = db.query(models.Card).filter(models.Card.column_id == column_id).count()
+        
+        logger.info(f"Куратор {current_user.username} изменил WIP лимит колонки '{column.title}' с {old_limit} на {wip_data.wip_limit}")
+        
+        return {
+            "message": f"WIP лимит колонки '{column.title}' успешно {'установлен' if old_limit is None else 'изменен'}",
+            "column": {
+                "id": column.id,
+                "title": column.title,
+                "wip_limit": column.wip_limit,
+                "cards_count": cards_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении WIP лимита: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении WIP лимита: {str(e)}"
+        )
+
+# Функция для проверки WIP лимитов
+def check_wip_limit(db: Session, column_id: int) -> bool:
+    """Проверить, можно ли добавить карточку в колонку (не превышен ли WIP лимит)"""
+    try:
+        column = db.query(models.KanbanColumn).filter(models.KanbanColumn.id == column_id).first()
+        if not column:
+            return True  # Если колонка не найдена, разрешаем (будет ошибка позже)
+        
+        # Если лимит не установлен, разрешаем
+        if column.wip_limit is None:
+            return True
+        
+        # Считаем текущее количество карточек в колонке
+        current_cards_count = db.query(models.Card).filter(models.Card.column_id == column_id).count()
+        
+        # Проверяем, не превышен ли лимит
+        return current_cards_count < column.wip_limit
+        
+    except Exception as e:
+        logger.error(f"Ошибка при проверке WIP лимита для колонки {column_id}: {str(e)}")
+        return True  # В случае ошибки разрешаем (не блокируем пользователя)
 
 # Добавляем обработчик ошибок
 @app.exception_handler(Exception)
