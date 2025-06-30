@@ -77,15 +77,15 @@ export const AuthProvider = ({ children }) => {
 
   // Функции для проверки ролей
   const isAdmin = () => {
-    return user?.role === 'admin';
+    return user?.role === 'ADMIN';
   };
 
   const isCurator = () => {
-    return user?.role === 'curator';
+    return user?.role === 'CURATOR';
   };
 
   const isCuratorOrAdmin = () => {
-    return user?.role === 'curator' || user?.role === 'admin';
+    return user?.role === 'CURATOR' || user?.role === 'ADMIN';
   };
 
   const hasRole = (requiredRole) => {

@@ -98,11 +98,11 @@ const AdminPanel = () => {
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'admin':
+      case 'ADMIN':
         return 'error';
-      case 'curator':
+      case 'CURATOR':
         return 'warning';
-      case 'user':
+      case 'USER':
         return 'default';
       default:
         return 'default';
