@@ -4,21 +4,24 @@ __pycache__
 *.pyo
 *.pyd
 .Python
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
+*.so
 .git
-.mypy_cache
+.gitignore
+README.md
+.env
+.venv
+venv/
+env/
 .pytest_cache
-.hypothesis
+.coverage
+.tox
+.mypy_cache
+.DS_Store
+*.log
+logs/
+alembic/versions/__pycache__
+*.sqlite
+*.db
 
 # Исключаем локальные файлы разработки
 .vscode

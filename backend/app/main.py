@@ -201,6 +201,10 @@ async def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db))
 async def root():
     return {"message": "Добро пожаловать в Kanban Tracker API"}
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
 @app.get("/api/columns")
 async def get_columns(db: Session = Depends(get_db)):
     try:

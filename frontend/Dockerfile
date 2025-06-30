@@ -1,9 +1,9 @@
 # Этап сборки
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Копируем файлы package.json и package-lock.json
+# Копируем файлы package.json и package-lock.json для кеширования слоя зависимостей
 COPY package*.json ./
 
 # Устанавливаем зависимости

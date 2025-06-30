@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Обновляем пакеты и устанавливаем необходимые инструменты для работы с сертификатами
+# Обновляем пакеты и устанавливаем необходимые инструменты
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
@@ -19,11 +19,15 @@ RUN pip config set global.trusted-host pypi.org && \
 # Обновляем pip до последней версии
 RUN pip install --upgrade pip
 
+# Копируем requirements.txt для кеширования слоя зависимостей
 COPY requirements.txt .
 
 # Устанавливаем зависимости с дополнительными флагами для SSL
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
+# Копируем исходный код
 COPY . .
+
+EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
