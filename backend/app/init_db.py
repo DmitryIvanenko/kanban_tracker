@@ -4,6 +4,7 @@ from .database import SessionLocal
 from .models import KanbanColumn
 from .auth import get_password_hash
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -24,32 +25,45 @@ def init_db():
 
 def create_admin_user():
     """
-    Создает или обновляет пароль администратора
+    Создает или обновляет администратора на основе переменных окружения
     """
+    # Получаем данные администратора из переменных окружения
+    admin_username = os.getenv('ADMIN_USERNAME', 'admin')
+    admin_password = os.getenv('ADMIN_PASSWORD', 'admin')
+    admin_telegram = os.getenv('ADMIN_TELEGRAM', '@admin')
+    
+    if not admin_password or admin_password == 'your_secure_password_here':
+        logger.error("ADMIN_PASSWORD не установлен или содержит значение по умолчанию")
+        print("Ошибка: ADMIN_PASSWORD должен быть установлен в переменных окружения")
+        return
+    
     db = SessionLocal()
     try:
-        # Ищем пользователя admin
-        admin_user = db.query(models.User).filter(models.User.username == 'admin').first()
+        # Ищем пользователя по username из env
+        admin_user = db.query(models.User).filter(models.User.username == admin_username).first()
         
         if admin_user:
-            # Обновляем пароль
-            admin_user.hashed_password = get_password_hash('admin')
+            # Обновляем данные администратора
+            admin_user.hashed_password = get_password_hash(admin_password)
+            admin_user.telegram = admin_telegram
+            admin_user.role = models.UserRole.ADMIN
+            admin_user.is_active = True
             db.commit()
-            logger.info("Пароль администратора обновлен")
-            print("Пароль администратора успешно обновлен")
+            logger.info(f"Администратор {admin_username} обновлен")
+            print(f"Администратор {admin_username} успешно обновлен")
         else:
             # Создаем нового администратора
             admin_user = models.User(
-                username='admin',
-                hashed_password=get_password_hash('admin'),
-                telegram='@admin',
+                username=admin_username,
+                hashed_password=get_password_hash(admin_password),
+                telegram=admin_telegram,
                 is_active=True,
                 role=models.UserRole.ADMIN
             )
             db.add(admin_user)
             db.commit()
-            logger.info("Администратор создан")
-            print("Администратор успешно создан")
+            logger.info(f"Администратор {admin_username} создан")
+            print(f"Администратор {admin_username} успешно создан")
     except Exception as e:
         logger.error(f"Ошибка при создании/обновлении администратора: {e}")
         print(f"Ошибка: {e}")

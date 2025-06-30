@@ -32,22 +32,56 @@ cd kanban-tracker
 ```
 
 2. Настройте переменные окружения:
+
+Создайте файл `.env` в корневой директории проекта:
+
 ```bash
-cp .env.example .env
+# Telegram Bot Token
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Admin User Configuration
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your_secure_password_here
+ADMIN_TELEGRAM=@admin
 ```
-Отредактируйте файл `.env` и укажите ваш токен Telegram бота:
-- Получите токен у @BotFather в Telegram
-- Замените `your_telegram_bot_token_here` на ваш токен
+
+**Описание переменных:**
+- `TELEGRAM_BOT_TOKEN` - токен телеграм бота для уведомлений (получите у @BotFather)
+- `ADMIN_USERNAME` - имя пользователя администратора (по умолчанию: admin)  
+- `ADMIN_PASSWORD` - пароль администратора (**ОБЯЗАТЕЛЬНО** установите безопасный пароль)
+- `ADMIN_TELEGRAM` - телеграм администратора (по умолчанию: @admin)
+
+**Важно:** 
+- Никогда не коммитьте файл .env в репозиторий
+- Используйте надежный пароль для ADMIN_PASSWORD
+- Каждая среда должна иметь свой .env файл
 
 3. Запустите проект с помощью Docker Compose:
 ```bash
 docker-compose up --build
 ```
 
-3. Приложение будет доступно по следующим адресам:
+4. Приложение будет доступно по следующим адресам:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - Swagger документация: http://localhost:8000/docs
+
+### Настройка администратора
+
+После первого запуска создайте/обновите учетную запись администратора:
+
+```bash
+# Создайте/обновите администратора
+docker-compose exec backend python -c "import sys; sys.path.append('/app'); from app.init_db import create_admin_user; create_admin_user()"
+```
+
+Или используйте миграцию базы данных (администратор создается автоматически):
+
+```bash
+docker-compose exec backend alembic upgrade head
+```
+
+После этого вы сможете войти в систему под логином и паролем, указанными в файле `.env`.
 
 ## Структура проекта
 
