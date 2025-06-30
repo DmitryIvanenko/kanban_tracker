@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, date
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -13,7 +14,7 @@ from .init_db import init_db
 from typing import List, Optional
 import logging
 import json
-from .auth import get_current_user, create_access_token, verify_password
+from .auth import get_current_user, create_access_token, verify_password, get_password_hash
 from .telegram_bot import send_approver_notification, send_approver_change_notification
 import re
 from fastapi.responses import JSONResponse
@@ -145,8 +146,32 @@ async def register_user(user: schemas.UserCreate, db: Session = Depends(get_db))
         db.refresh(db_user)
         logger.info(f"Пользователь успешно зарегистрирован: {user.username}")
         return db_user
+    except IntegrityError as e:
+        logger.warning(f"Ошибка уникальности при регистрации пользователя {user.username}: {str(e)}")
+        db.rollback()
+        if "duplicate key value violates unique constraint" in str(e):
+            if "ix_users_username" in str(e):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Пользователь с именем '{user.username}' уже существует"
+                )
+            elif "ix_users_email" in str(e):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Пользователь с email '{user.email}' уже существует"
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Пользователь с такими данными уже существует"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка целостности данных: {str(e)}"
+            )
     except Exception as e:
-        logger.error(f"Ошибка при регистрации пользователя {user.username}: {str(e)}")
+        logger.error(f"Неожиданная ошибка при регистрации пользователя {user.username}: {str(e)}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

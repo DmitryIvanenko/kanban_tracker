@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from . import models
 from .database import SessionLocal
 from .models import KanbanColumn
@@ -48,9 +49,14 @@ def create_admin_user():
             admin_user.telegram = admin_telegram
             admin_user.role = models.UserRole.ADMIN
             admin_user.is_active = True
-            db.commit()
-            logger.info(f"Администратор {admin_username} обновлен")
-            print(f"Администратор {admin_username} успешно обновлен")
+            try:
+                db.commit()
+                logger.info(f"Администратор {admin_username} обновлен")
+                print(f"Администратор {admin_username} успешно обновлен")
+            except IntegrityError as e:
+                db.rollback()
+                logger.error(f"Ошибка при обновлении администратора {admin_username}: {e}")
+                print(f"Ошибка при обновлении администратора: {e}")
         else:
             # Создаем нового администратора
             admin_user = models.User(
@@ -61,9 +67,28 @@ def create_admin_user():
                 role=models.UserRole.ADMIN
             )
             db.add(admin_user)
-            db.commit()
-            logger.info(f"Администратор {admin_username} создан")
-            print(f"Администратор {admin_username} успешно создан")
+            try:
+                db.commit()
+                logger.info(f"Администратор {admin_username} создан")
+                print(f"Администратор {admin_username} успешно создан")
+            except IntegrityError as e:
+                db.rollback()
+                if "duplicate key value violates unique constraint" in str(e):
+                    logger.warning(f"Пользователь {admin_username} уже существует")
+                    print(f"Пользователь {admin_username} уже существует")
+                    # Попробуем найти существующего пользователя и обновить его
+                    existing_user = db.query(models.User).filter(models.User.username == admin_username).first()
+                    if existing_user:
+                        existing_user.hashed_password = get_password_hash(admin_password)
+                        existing_user.telegram = admin_telegram
+                        existing_user.role = models.UserRole.ADMIN
+                        existing_user.is_active = True
+                        db.commit()
+                        logger.info(f"Существующий пользователь {admin_username} обновлен до роли администратора")
+                        print(f"Существующий пользователь {admin_username} обновлен до роли администратора")
+                else:
+                    logger.error(f"Неожиданная ошибка целостности при создании администратора {admin_username}: {e}")
+                    print(f"Ошибка создания администратора: {e}")
     except Exception as e:
         logger.error(f"Ошибка при создании/обновлении администратора: {e}")
         print(f"Ошибка: {e}")
