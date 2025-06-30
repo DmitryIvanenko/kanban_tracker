@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -7,7 +7,9 @@ import {
   Button,
   Typography,
   Link,
-  Paper
+  Paper,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,42 +18,69 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [telegram, setTelegram] = useState('');
-  const [error, setError] = useState('');
+  const [error, setErrorState] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Функция для работы с персистентными ошибками
+  const setError = useCallback((errorMessage) => {
+    if (errorMessage) {
+      // Сохраняем ошибку в sessionStorage для персистентности
+      sessionStorage.setItem('loginError', errorMessage);
+    } else {
+      // Очищаем ошибку из sessionStorage
+      sessionStorage.removeItem('loginError');
+    }
+    
+    setErrorState(errorMessage);
+  }, []);
+
+  // Восстанавливаем ошибку при загрузке компонента
+  React.useEffect(() => {
+    const savedError = sessionStorage.getItem('loginError');
+    if (savedError) {
+      setErrorState(savedError);
+    }
+  }, []);
+
+
   const navigate = useNavigate();
   const { login, register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    console.log('Начало обработки формы:', { isLogin, username, password });
+    setLoading(true);
     
-    if (isLogin) {
-      console.log('Попытка входа с параметрами:', { username, password });
-      const result = await login(username, password);
-      console.log('Результат входа:', result);
-      if (result.success) {
-        console.log('Вход успешен, перенаправляем на главную страницу');
-        navigate('/');
-      } else {
-        setError(result.error || 'Ошибка при входе');
-      }
-    } else {
-      console.log('Попытка регистрации с параметрами:', { username, password, telegram });
-      const result = await register({ username, password, telegram });
-      console.log('Результат регистрации:', result);
-      if (result.success) {
-        console.log('Регистрация успешна, выполняем вход...');
-        const loginResult = await login(username, password);
-        console.log('Результат входа после регистрации:', loginResult);
-        if (loginResult.success) {
-          console.log('Вход после регистрации успешен, перенаправляем на главную страницу');
+    try {
+      if (isLogin) {
+        const result = await login(username, password);
+        if (result.success) {
+          setError(''); // Очищаем ошибку только при успешном входе
           navigate('/');
         } else {
-          setError(loginResult.error || 'Ошибка при входе после регистрации');
+          const errorMessage = result.error || 'Неверное имя пользователя или пароль';
+          setError(errorMessage);
         }
       } else {
-        setError(result.error || 'Ошибка при регистрации');
+        const result = await register({ username, password, telegram });
+        if (result.success) {
+          setError(''); // Очищаем ошибку при успешной регистрации
+          const loginResult = await login(username, password);
+          if (loginResult.success) {
+            navigate('/');
+          } else {
+            const errorMessage = loginResult.error || 'Ошибка при входе после регистрации';
+            setError(errorMessage);
+          }
+        } else {
+          const errorMessage = result.error || 'Ошибка при регистрации';
+          setError(errorMessage);
+        }
       }
+    } catch (error) {
+      console.error('Неожиданная ошибка в handleSubmit:', error);
+      setError('Произошла неожиданная ошибка. Попробуйте еще раз.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -80,7 +109,12 @@ const Login = () => {
               autoComplete="username"
               autoFocus
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+              }}
+              onFocus={() => {
+                if (error) setError(''); // Очищаем ошибку при фокусе на поле
+              }}
             />
             <TextField
               margin="normal"
@@ -92,7 +126,12 @@ const Login = () => {
               id="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+              }}
+              onFocus={() => {
+                if (error) setError(''); // Очищаем ошибку при фокусе на поле
+              }}
             />
             {!isLogin && (
               <TextField
@@ -104,22 +143,32 @@ const Login = () => {
                 name="telegram"
                 placeholder="@username или 123456789"
                 value={telegram}
-                onChange={(e) => setTelegram(e.target.value)}
+                onChange={(e) => {
+                  setTelegram(e.target.value);
+                }}
+                onFocus={() => {
+                  if (error) setError(''); // Очищаем ошибку при фокусе на поле
+                }}
                 helperText="Укажите ваш Telegram username (например, @myname) или chat_id (только цифры)"
               />
             )}
             {error && (
-              <Typography color="error" align="center" sx={{ mt: 2 }}>
+              <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
                 {error}
-              </Typography>
+              </Alert>
             )}
             <Button
               type="submit"
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={loading || !username || !password || (!isLogin && !telegram)}
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
             >
-              {isLogin ? 'Войти' : 'Зарегистрироваться'}
+              {loading 
+                ? (isLogin ? 'Вход...' : 'Регистрация...') 
+                : (isLogin ? 'Войти' : 'Зарегистрироваться')
+              }
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link
@@ -129,6 +178,7 @@ const Login = () => {
                   setIsLogin(!isLogin);
                   setError('');
                   setTelegram(''); // Очищаем поле Telegram при переключении
+                  setLoading(false); // Сбрасываем состояние загрузки
                 }}
               >
                 {isLogin

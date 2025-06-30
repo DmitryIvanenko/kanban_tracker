@@ -190,10 +190,14 @@ async def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db))
         
         if not user:
             logger.error(f"Пользователь {login_data.username} не найден")
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверное имя пользователя или пароль",
-                headers={"WWW-Authenticate": "Bearer"},
+                content={"detail": "Неверное имя пользователя или пароль"},
+                headers={
+                    "WWW-Authenticate": "Bearer",
+                    "Access-Control-Allow-Origin": "http://localhost:3000",
+                    "Access-Control-Allow-Credentials": "true"
+                }
             )
         
         logger.info(f"Найден пользователь: {user.username}")
@@ -203,10 +207,14 @@ async def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db))
         
         if not is_valid:
             logger.error(f"Неверный пароль для пользователя {login_data.username}")
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверное имя пользователя или пароль",
-                headers={"WWW-Authenticate": "Bearer"},
+                content={"detail": "Неверное имя пользователя или пароль"},
+                headers={
+                    "WWW-Authenticate": "Bearer",
+                    "Access-Control-Allow-Origin": "http://localhost:3000",
+                    "Access-Control-Allow-Credentials": "true"
+                }
             )
         
         logger.info(f"Успешный вход пользователя {login_data.username}")
@@ -217,9 +225,13 @@ async def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db))
         raise
     except Exception as e:
         logger.error(f"Неожиданная ошибка при входе: {str(e)}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Внутренняя ошибка сервера: {str(e)}"
+            content={"detail": f"Внутренняя ошибка сервера: {str(e)}"},
+            headers={
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Credentials": "true"
+            }
         )
 
 @app.get("/")
