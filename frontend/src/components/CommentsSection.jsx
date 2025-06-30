@@ -10,6 +10,8 @@ import {
   CircularProgress
 } from '@mui/material';
 import { getCardComments, createCardComment } from '../services/api';
+import { SafeComment } from './SafeHTML';
+import { validateAndSanitizeComment } from '../utils/sanitizer';
 
 const CommentsSection = ({ cardId }) => {
   const [comments, setComments] = useState([]);
@@ -42,9 +44,18 @@ const CommentsSection = ({ cardId }) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
+    // Валидируем и санитизируем комментарий
+    const validation = validateAndSanitizeComment(newComment.trim());
+    
+    if (!validation.isValid) {
+      setError(validation.message);
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await createCardComment(cardId, { content: newComment.trim() });
+      setError(''); // Очищаем предыдущие ошибки
+      await createCardComment(cardId, { content: validation.sanitized });
       setNewComment('');
       await fetchComments(); // Обновляем список комментариев
     } catch (error) {
@@ -139,9 +150,11 @@ const CommentsSection = ({ cardId }) => {
                       {formatDate(comment.created_at)}
                     </Typography>
                   </Box>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {comment.content}
-                  </Typography>
+                  <SafeComment 
+                    content={comment.content}
+                    variant="body2"
+                    component={Typography}
+                  />
                 </Box>
               </Box>
               {index < comments.length - 1 && <Divider />}

@@ -22,11 +22,13 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/kanban
-      - SECRET_KEY=your-secret-key-here
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - ADMIN_TELEGRAM=${ADMIN_TELEGRAM}
+      - ADMIN_TELEGRAM=${ADMIN_TELEGRAM:-@admin}
+      - DEBUG=${DEBUG:-false}
+      - ENV=${ENV:-development}
     depends_on:
       - db
     networks:

@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { getCard } from '../services/api';
 import EditTicketModal from './EditTicketModal';
+import { SafeTitle, SafeTag } from './SafeHTML';
 
 // Функция для получения цвета типа недвижимости
 const getRealEstateTypeColor = (realEstateType) => {
@@ -78,9 +79,11 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
-          {column.title}
-        </Typography>
+        <SafeTitle 
+          content={column.title}
+          variant="h6"
+          component={Typography}
+        />
         {column.wip_limit && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip
@@ -142,9 +145,12 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
                       }}
                     >
                       <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          {card.title}
-                        </Typography>
+                        <SafeTitle 
+                          content={card.title}
+                          variant="h6" 
+                          gutterBottom
+                          component={Typography}
+                        />
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             {card.assignee && (
@@ -181,7 +187,7 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
                               {card.tags.map((tag) => (
                                 <Chip
                                   key={tag.id}
-                                  label={tag.name}
+                                  label={<SafeTag content={tag.name} />}
                                   size="small"
                                   variant="outlined"
                                   sx={{

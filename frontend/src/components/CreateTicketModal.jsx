@@ -15,6 +15,7 @@ import {
   Chip
 } from '@mui/material';
 import { getUsers, createCard, getRealEstateTypes } from '../services/api';
+import { validateAndSanitizeTitle, sanitizeUserInput } from '../utils/sanitizer';
 
 const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const [title, setTitle] = useState('');
@@ -58,9 +59,15 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
   const handleTagKeyPress = (e) => {
     if (e.key === 'Enter' && currentTag.trim()) {
       e.preventDefault();
-      const newTag = currentTag.trim();
-      if (!tags.includes(newTag)) {
+      const newTag = sanitizeUserInput(currentTag.trim(), 'STRICT');
+      
+      if (newTag && !tags.includes(newTag)) {
+        if (tags.length >= 5) {
+          setError('Максимальное количество тегов - 5');
+          return;
+        }
         setTags([...tags, newTag]);
+        setError(''); // Очищаем ошибку если тег добавлен успешно
       }
       setCurrentTag('');
     }
@@ -83,9 +90,11 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
     console.log('CreateTicketModal: realEstateType:', realEstateType);
     console.log('CreateTicketModal: tags:', tags);
 
-    if (!title.trim()) {
-      console.log('CreateTicketModal: ошибка - пустое название');
-      setError('Название обязательно');
+    // Валидируем и санитизируем название
+    const titleValidation = validateAndSanitizeTitle(title.trim());
+    if (!titleValidation.isValid) {
+      console.log('CreateTicketModal: ошибка - некорректное название:', titleValidation.message);
+      setError(titleValidation.message);
       return;
     }
 
@@ -95,9 +104,15 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       return;
     }
 
+    // Санитизируем описание
+    const sanitizedDescription = sanitizeUserInput(description.trim(), 'BASIC');
+    
+    // Санитизируем теги
+    const sanitizedTags = tags.map(tag => sanitizeUserInput(tag, 'STRICT'));
+
     const cardData = {
-      title: title.trim(),
-      description: description.trim(),
+      title: titleValidation.sanitized,
+      description: sanitizedDescription,
       story_points: parseInt(storyPoints),
       column_id: columnId,
       assignee_id: assigneeId || null,
@@ -105,7 +120,7 @@ const CreateTicketModal = ({ open, onClose, onSuccess, columnId }) => {
       real_estate_type: realEstateType || null,
       rc_mk: rcMk || null,
       rc_zm: rcZm || null,
-      tags
+      tags: sanitizedTags
     };
 
     console.log('CreateTicketModal: отправка данных тикета:', cardData);

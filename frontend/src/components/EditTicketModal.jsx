@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { api, updateCard, deleteCard, getUsers, getColumn, getRealEstateTypes } from '../services/api';
 import CommentsSection from './CommentsSection';
+import { validateAndSanitizeTitle, sanitizeUserInput } from '../utils/sanitizer';
 
 const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const [title, setTitle] = useState('');
@@ -133,7 +134,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
   const handleTagKeyPress = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const newTag = currentTag.trim();
+      const newTag = sanitizeUserInput(currentTag.trim(), 'STRICT');
       if (!newTag) return;
       
       if (tags.length >= 5) {
@@ -143,6 +144,7 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
       
       if (!tags.includes(newTag)) {
         setTags([...tags, newTag]);
+        setError(''); // Очищаем ошибку если тег добавлен успешно
       }
       setCurrentTag('');
     }
@@ -156,8 +158,10 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
     e.preventDefault();
     setError('');
 
-    if (!title.trim()) {
-      setError('Название обязательно');
+    // Валидируем и санитизируем название
+    const titleValidation = validateAndSanitizeTitle(title.trim());
+    if (!titleValidation.isValid) {
+      setError(titleValidation.message);
       return;
     }
 
@@ -172,16 +176,20 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
     }
 
     try {
-      // Добавляем # к тегам перед отправкой
+      // Санитизируем описание
+      const sanitizedDescription = sanitizeUserInput(description.trim(), 'BASIC');
+      
+      // Санитизируем и форматируем теги
       const formattedTags = tags.map(tag => {
-        const tagName = tag.startsWith('#') ? tag : `#${tag}`;
+        const sanitizedTag = sanitizeUserInput(tag, 'STRICT');
+        const tagName = sanitizedTag.startsWith('#') ? sanitizedTag : `#${sanitizedTag}`;
         return tagName.replace(/^#+/, '#'); // Убираем лишние # в начале
       });
       console.log('Отправляем теги на бэкенд:', formattedTags);
       
       const cardData = {
-        title: title.trim(),
-        description: description.trim(),
+        title: titleValidation.sanitized,
+        description: sanitizedDescription,
         story_points: parseInt(storyPoints),
         assignee_id: assigneeId || null,
         approver_id: approverId || null,

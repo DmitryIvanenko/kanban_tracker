@@ -7,14 +7,15 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import get_db
+from .config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Настройки JWT
-SECRET_KEY = "your-secret-key-here"  # В продакшене использовать безопасный ключ
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Настройки JWT из валидированной конфигурации
+SECRET_KEY = settings.secret_key
+ALGORITHM = settings.jwt_algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.jwt_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")

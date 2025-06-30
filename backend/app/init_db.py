@@ -1,11 +1,12 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 from . import models
 from .database import SessionLocal
 from .models import KanbanColumn
 from .auth import get_password_hash
+from .config import settings
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def init_db():
     db = SessionLocal()
     try:
         # Проверяем подключение к БД
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         logger.info("База данных успешно инициализирована")
     except Exception as e:
         logger.info(f"Ошибка при проверке БД: {e}")
@@ -26,73 +27,78 @@ def init_db():
 
 def create_admin_user():
     """
-    Создает или обновляет администратора на основе переменных окружения
+    Создает или обновляет администратора на основе валидированных настроек.
+    Использует атомарную операцию для предотвращения дубликатов.
     """
-    # Получаем данные администратора из переменных окружения
-    admin_username = os.getenv('ADMIN_USERNAME', 'admin')
-    admin_password = os.getenv('ADMIN_PASSWORD', 'admin')
-    admin_telegram = os.getenv('ADMIN_TELEGRAM', '@admin')
+    # Получаем данные администратора из валидированных настроек
+    admin_username = settings.admin_username
+    admin_password = settings.get_admin_password()
+    admin_telegram = settings.admin_telegram
     
-    if not admin_password or admin_password == 'your_secure_password_here':
-        logger.error("ADMIN_PASSWORD не установлен или содержит значение по умолчанию")
-        print("Ошибка: ADMIN_PASSWORD должен быть установлен в переменных окружения")
-        return
+    # Валидация уже прошла в config.py, но на всякий случай проверим
+    if not admin_password:
+        logger.error("ADMIN_PASSWORD не установлен")
+        print("Ошибка: ADMIN_PASSWORD должен быть установлен и валидирован")
+        return False
     
     db = SessionLocal()
     try:
-        # Ищем пользователя по username из env
-        admin_user = db.query(models.User).filter(models.User.username == admin_username).first()
+        # Хешируем пароль заранее
+        hashed_password = get_password_hash(admin_password)
         
-        if admin_user:
-            # Обновляем данные администратора
-            admin_user.hashed_password = get_password_hash(admin_password)
-            admin_user.telegram = admin_telegram
-            admin_user.role = models.UserRole.ADMIN
-            admin_user.is_active = True
-            try:
-                db.commit()
-                logger.info(f"Администратор {admin_username} обновлен")
-                print(f"Администратор {admin_username} успешно обновлен")
-            except IntegrityError as e:
-                db.rollback()
-                logger.error(f"Ошибка при обновлении администратора {admin_username}: {e}")
-                print(f"Ошибка при обновлении администратора: {e}")
-        else:
-            # Создаем нового администратора
-            admin_user = models.User(
-                username=admin_username,
-                hashed_password=get_password_hash(admin_password),
-                telegram=admin_telegram,
-                is_active=True,
-                role=models.UserRole.ADMIN
-            )
-            db.add(admin_user)
-            try:
-                db.commit()
-                logger.info(f"Администратор {admin_username} создан")
+        # Используем атомарную операцию UPSERT (PostgreSQL ON CONFLICT)
+        upsert_query = text("""
+            INSERT INTO users (username, hashed_password, telegram, is_active, role, created_at)
+            VALUES (:username, :hashed_password, :telegram, :is_active, :role, NOW())
+            ON CONFLICT (username) 
+            DO UPDATE SET
+                hashed_password = EXCLUDED.hashed_password,
+                telegram = EXCLUDED.telegram,
+                role = EXCLUDED.role,
+                is_active = EXCLUDED.is_active
+            RETURNING id, 
+                CASE 
+                    WHEN xmax = 0 THEN 'inserted'
+                    ELSE 'updated'
+                END as action
+        """)
+        
+        result = db.execute(upsert_query, {
+            'username': admin_username,
+            'hashed_password': hashed_password,
+            'telegram': admin_telegram,
+            'is_active': True,
+            'role': 'ADMIN'
+        })
+        
+        row = result.fetchone()
+        db.commit()
+        
+        if row:
+            user_id, action = row
+            if action == 'inserted':
+                logger.info(f"Администратор {admin_username} успешно создан (ID: {user_id})")
                 print(f"Администратор {admin_username} успешно создан")
-            except IntegrityError as e:
-                db.rollback()
-                if "duplicate key value violates unique constraint" in str(e):
-                    logger.warning(f"Пользователь {admin_username} уже существует")
-                    print(f"Пользователь {admin_username} уже существует")
-                    # Попробуем найти существующего пользователя и обновить его
-                    existing_user = db.query(models.User).filter(models.User.username == admin_username).first()
-                    if existing_user:
-                        existing_user.hashed_password = get_password_hash(admin_password)
-                        existing_user.telegram = admin_telegram
-                        existing_user.role = models.UserRole.ADMIN
-                        existing_user.is_active = True
-                        db.commit()
-                        logger.info(f"Существующий пользователь {admin_username} обновлен до роли администратора")
-                        print(f"Существующий пользователь {admin_username} обновлен до роли администратора")
-                else:
-                    logger.error(f"Неожиданная ошибка целостности при создании администратора {admin_username}: {e}")
-                    print(f"Ошибка создания администратора: {e}")
-    except Exception as e:
-        logger.error(f"Ошибка при создании/обновлении администратора: {e}")
-        print(f"Ошибка: {e}")
+            else:
+                logger.info(f"Администратор {admin_username} успешно обновлен (ID: {user_id})")
+                print(f"Администратор {admin_username} успешно обновлен")
+            return True
+        else:
+            logger.error("Неожиданная ошибка при создании/обновлении администратора")
+            print("Ошибка при создании/обновлении администратора")
+            return False
+            
+    except IntegrityError as e:
         db.rollback()
+        # Эта ошибка не должна происходить с UPSERT, но на всякий случай
+        logger.error(f"Ошибка целостности при создании/обновлении администратора {admin_username}: {e}")
+        print(f"Ошибка целостности базы данных: {e}")
+        return False
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Неожиданная ошибка при создании/обновлении администратора {admin_username}: {e}")
+        print(f"Ошибка: {e}")
+        return False
     finally:
         db.close()
 

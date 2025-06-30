@@ -1,14 +1,14 @@
-import os
 import requests
 import logging
 from typing import Optional
 from .models import User, Card
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
-# Получаем токен бота из переменных окружения
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+# Получаем токен бота из валидированных настроек
+TELEGRAM_BOT_TOKEN = settings.get_telegram_bot_token()
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}" if TELEGRAM_BOT_TOKEN else None
 
 def send_telegram_message(chat_id: str, message: str) -> bool:
     """
@@ -21,8 +21,8 @@ def send_telegram_message(chat_id: str, message: str) -> bool:
     Returns:
         bool: True если сообщение отправлено успешно, False в противном случае
     """
-    if not TELEGRAM_BOT_TOKEN:
-        logger.warning("TELEGRAM_BOT_TOKEN не установлен. Уведомления отключены.")
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_API_URL:
+        logger.warning("TELEGRAM_BOT_TOKEN не установлен или невалиден. Уведомления отключены.")
         return False
         
     try:

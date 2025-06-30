@@ -2,11 +2,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import time
-import os
 from loguru import logger
+from .config import settings
 
-# Получаем URL базы данных из переменных окружения или используем значение по умолчанию
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/kanban")
+# Получаем URL базы данных через валидированную конфигурацию
+SQLALCHEMY_DATABASE_URL = settings.get_database_url()
 
 # Функция для проверки подключения к базе данных
 def wait_for_db(max_retries=5, retry_interval=5):

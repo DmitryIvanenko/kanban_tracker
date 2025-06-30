@@ -57,7 +57,13 @@ def upgrade():
         # Создаем администратора только если его еще нет
         admin_password_hash = get_password_hash(admin_password)
         
-        op.bulk_insert(users_table, [
+        # Используем INSERT с RETURNING для получения ID нового пользователя
+        insert_result = connection.execute(
+            sa.text("""
+                INSERT INTO users (username, email, hashed_password, telegram, is_active, role, created_at)
+                VALUES (:username, :email, :hashed_password, :telegram, :is_active, :role, :created_at)
+                RETURNING id
+            """),
             {
                 'username': admin_username,
                 'email': None,
@@ -67,9 +73,32 @@ def upgrade():
                 'role': 'ADMIN',
                 'created_at': datetime.utcnow()
             }
-        ])
-        print(f"Администратор {admin_username} создан")
+        )
+        
+        admin_id = insert_result.fetchone()[0]
+        
+        # Обновляем owner_id основной доски на ID созданного администратора
+        connection.execute(
+            sa.text("UPDATE boards SET owner_id = :admin_id WHERE id = 1"),
+            {"admin_id": admin_id}
+        )
+        
+        print(f"Администратор {admin_username} создан с ID {admin_id}")
+        print(f"Основная доска привязана к администратору")
     else:
+        # Если пользователь существует, обновляем owner_id доски на его ID
+        existing_admin = connection.execute(
+            sa.text("SELECT id FROM users WHERE username = :username"),
+            {"username": admin_username}
+        ).fetchone()
+        
+        if existing_admin:
+            connection.execute(
+                sa.text("UPDATE boards SET owner_id = :admin_id WHERE id = 1"),
+                {"admin_id": existing_admin[0]}
+            )
+            print(f"Основная доска привязана к существующему администратору (ID: {existing_admin[0]})")
+        
         print(f"Пользователь {admin_username} уже существует, пропускаем создание")
 
 
