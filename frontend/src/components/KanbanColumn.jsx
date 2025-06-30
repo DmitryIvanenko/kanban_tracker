@@ -55,6 +55,12 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
   };
 
   if (!column) return null;
+  
+  // Валидация данных: cards_count должен всегда присутствовать
+  if (column.cards_count === undefined || column.cards_count === null) {
+    console.error('⚠️ KanbanColumn: cards_count отсутствует в данных колонки:', column);
+  }
+  
   const cards = column.cards || [];
   console.log('KanbanColumn render:', { columnId: column.id, cardsCount: cards.length, cards });
 
@@ -78,11 +84,11 @@ const KanbanColumn = ({ column, swimlanePrefix = "" }) => {
         {column.wip_limit && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip
-              label={`${column.cards_count || cards.length}/${column.wip_limit}`}
+              label={`${column.cards_count}/${column.wip_limit}`}
               size="small"
               color={
-                (column.cards_count || cards.length) >= column.wip_limit ? 'error' :
-                (column.cards_count || cards.length) >= column.wip_limit * 0.8 ? 'warning' : 'success'
+                column.cards_count >= column.wip_limit ? 'error' :
+                column.cards_count >= column.wip_limit * 0.8 ? 'warning' : 'success'
               }
               sx={{ fontWeight: 'bold' }}
             />

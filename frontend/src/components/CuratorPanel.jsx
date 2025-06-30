@@ -132,6 +132,10 @@ const CuratorPanel = () => {
     return `Осталось: ${remaining}`;
   };
 
+  const isSaveDisabled = (columnId, column) => {
+    return updating === columnId || String(wipLimits[columnId]) === String(column.wip_limit || '');
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -255,7 +259,7 @@ const CuratorPanel = () => {
                           size="small"
                           startIcon={<SaveIcon />}
                           onClick={() => handleSaveWipLimit(column.id)}
-                          disabled={updating === column.id || String(wipLimits[column.id]) === String(column.wip_limit || '')}
+                          disabled={isSaveDisabled(column.id, column)}
                         >
                           Сохранить
                         </Button>
