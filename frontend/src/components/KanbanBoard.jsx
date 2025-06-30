@@ -150,27 +150,49 @@ const KanbanBoard = () => {
     
     // 1. ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ - обновляем UI локально
     console.log('⚡ Optimistic update');
-    const newColumns = [...columnsRef.current];
     
     // Находим исходную и целевую колонки
-    const sourceColumnIndex = newColumns.findIndex(col => col.id === sourceInfo.columnId);
-    const destColumnIndex = newColumns.findIndex(col => col.id === destInfo.columnId);
+    const sourceColumnIndex = columnsRef.current.findIndex(col => col.id === sourceInfo.columnId);
+    const destColumnIndex = columnsRef.current.findIndex(col => col.id === destInfo.columnId);
     
     if (sourceColumnIndex !== -1 && destColumnIndex !== -1) {
-      // Находим перемещаемую карточку
-      const sourceColumn = newColumns[sourceColumnIndex];
+      const sourceColumn = columnsRef.current[sourceColumnIndex];
       const cardIndex = sourceColumn.cards.findIndex(card => card.id === cardId);
       
       if (cardIndex !== -1) {
-        const [movedCard] = sourceColumn.cards.splice(cardIndex, 1);
+        const movedCard = sourceColumn.cards[cardIndex];
         
-        // Вставляем в целевую колонку
-        const destColumn = newColumns[destColumnIndex];
-        destColumn.cards.splice(destination.index, 0, movedCard);
+        // Создаем полностью новое состояние с правильным неизменяемым обновлением
+        const newColumns = columnsRef.current.map((column, index) => {
+          if (index === sourceColumnIndex) {
+            // Исходная колонка: убираем карточку
+            const newCards = column.cards.filter(card => card.id !== cardId);
+            return {
+              ...column,
+              cards: newCards,
+              cards_count: newCards.length
+            };
+          } else if (index === destColumnIndex) {
+            // Целевая колонка: добавляем карточку
+            const newCards = [...column.cards];
+            newCards.splice(destination.index, 0, movedCard);
+            return {
+              ...column,
+              cards: newCards,
+              cards_count: newCards.length
+            };
+          } else {
+            // Остальные колонки без изменений
+            return column;
+          }
+        });
         
         // Обновляем состояние локально для мгновенного UI отклика
         setColumns(newColumns);
-        console.log('✅ UI updated');
+        console.log('✅ UI updated with cards_count:', {
+          sourceCount: newColumns[sourceColumnIndex].cards_count,
+          destCount: newColumns[destColumnIndex].cards_count
+        });
       }
     }
     
