@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, validator
 from datetime import datetime
 from typing import Optional, List
 import re
-from .models import RealEstateType
+from .models import RealEstateType, UserRole
 
 class LoginRequest(BaseModel):
     username: str
@@ -65,6 +65,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
+    role: UserRole
     is_active: bool
     created_at: datetime
     email: Optional[str] = None
@@ -79,6 +80,22 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+class UserRoleUpdate(BaseModel):
+    user_id: int
+    role: UserRole
+
+class AdminUserResponse(BaseModel):
+    id: int
+    username: str
+    role: UserRole
+    is_active: bool
+    created_at: datetime
+    telegram: str
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class TagBase(BaseModel):
     name: str

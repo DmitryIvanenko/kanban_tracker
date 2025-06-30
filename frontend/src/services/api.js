@@ -171,6 +171,22 @@ export const verifyPassword = async (password) => {
   return response.data;
 };
 
+// Админские функции для управления ролями
+export const getAdminUsers = async () => {
+  const response = await api.get('/api/admin/users');
+  return response.data;
+};
+
+export const updateUserRole = async (userId, roleData) => {
+  const response = await api.put(`/api/admin/users/${userId}/role`, roleData);
+  return response.data;
+};
+
+export const getAvailableRoles = async () => {
+  const response = await api.get('/api/admin/roles');
+  return response.data;
+};
+
 // Алиас для updateCard (на случай если где-то используется editCard)
 export const editCard = updateCard;
 

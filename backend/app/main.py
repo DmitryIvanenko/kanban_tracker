@@ -1028,6 +1028,112 @@ async def delete_card(
         logger.error("Полный стек ошибки:", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+# Функции для проверки ролей
+def require_admin_role(current_user: models.User = Depends(get_current_user)):
+    """Проверяет, что текущий пользователь имеет роль admin"""
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав доступа. Требуется роль администратора."
+        )
+    return current_user
+
+def require_curator_or_admin_role(current_user: models.User = Depends(get_current_user)):
+    """Проверяет, что текущий пользователь имеет роль curator или admin"""
+    if current_user.role not in [models.UserRole.CURATOR, models.UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недостаточно прав доступа. Требуется роль куратора или администратора."
+        )
+    return current_user
+
+# API endpoints для управления ролями (только для админов)
+@app.get("/api/admin/users", response_model=List[schemas.AdminUserResponse])
+async def get_all_users_for_admin(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Получить список всех пользователей для админки"""
+    try:
+        users = db.query(models.User).order_by(models.User.created_at).all()
+        return users
+    except Exception as e:
+        logger.error(f"Ошибка при получении пользователей для админки: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при получении списка пользователей: {str(e)}"
+        )
+
+@app.put("/api/admin/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role_data: schemas.UserRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin_role)
+):
+    """Обновить роль пользователя (только для админов)"""
+    try:
+        # Проверяем, что пользователь существует
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Пользователь не найден"
+            )
+        
+        # Проверяем, что ID в URL совпадает с ID в теле запроса
+        if user_id != role_data.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ID пользователя в URL не совпадает с ID в теле запроса"
+            )
+        
+        # Не позволяем админу изменить свою собственную роль
+        if user_id == current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя изменить собственную роль"
+            )
+        
+        # Обновляем роль
+        old_role = user.role
+        user.role = role_data.role
+        db.commit()
+        db.refresh(user)
+        
+        logger.info(f"Админ {current_user.username} изменил роль пользователя {user.username} с {old_role.value} на {role_data.role.value}")
+        
+        return {
+            "message": f"Роль пользователя {user.username} успешно изменена на {role_data.role.value}",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "is_active": user.is_active
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении роли пользователя: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при обновлении роли: {str(e)}"
+        )
+
+@app.get("/api/admin/roles")
+async def get_available_roles(current_user: models.User = Depends(require_admin_role)):
+    """Получить список доступных ролей"""
+    return {
+        "roles": [
+            {"value": "USER", "label": "Пользователь"},
+            {"value": "CURATOR", "label": "Куратор"},
+            {"value": "ADMIN", "label": "Администратор"}
+        ]
+    }
+
 # Добавляем обработчик ошибок
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

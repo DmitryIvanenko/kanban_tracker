@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, isAdmin } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -34,6 +34,15 @@ const Layout = ({ children }) => {
           >
             Доска
           </Button>
+          {isAdmin() && (
+            <Button
+              color="inherit"
+              onClick={() => navigate('/admin')}
+              sx={{ mr: 2, color: '#000000' }}
+            >
+              Админка
+            </Button>
+          )}
           <Button
             color="inherit"
             onClick={() => navigate('/statistics')}

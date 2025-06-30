@@ -75,13 +75,35 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Функции для проверки ролей
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
+  const isCurator = () => {
+    return user?.role === 'curator';
+  };
+
+  const isCuratorOrAdmin = () => {
+    return user?.role === 'curator' || user?.role === 'admin';
+  };
+
+  const hasRole = (requiredRole) => {
+    return user?.role === requiredRole;
+  };
+
   const value = {
     user,
     loading,
     login,
     register,
     logout,
-    getCurrentUser
+    getCurrentUser,
+    // Функции проверки ролей
+    isAdmin,
+    isCurator,
+    isCuratorOrAdmin,
+    hasRole
   };
 
   if (loading) {

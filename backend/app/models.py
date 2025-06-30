@@ -21,6 +21,11 @@ class RCType(enum.Enum):
     URAL = "Урал"
     SIBIR = "Сибирь"
 
+class UserRole(enum.Enum):
+    USER = "USER"
+    CURATOR = "CURATOR"
+    ADMIN = "ADMIN"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -29,6 +34,7 @@ class User(Base):
     email = Column(String(100), unique=True, index=True, nullable=True)
     hashed_password = Column(String(100), nullable=False)
     telegram = Column(String(100), nullable=False)  # Telegram username или chat_id (обязательное поле)
+    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)  # Роль пользователя
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     

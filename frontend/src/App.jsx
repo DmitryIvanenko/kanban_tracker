@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import KanbanBoard from './components/KanbanBoard';
 import Statistics from './components/Statistics.jsx';
+import AdminPanel from './components/AdminPanel';
 import Layout from './components/Layout';
 
 const theme = createTheme({
@@ -36,6 +37,20 @@ const PrivateRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" />;
 };
 
+const AdminRoute = ({ children }) => {
+  const { user, isAdmin } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!isAdmin()) {
+    return <Navigate to="/" />;
+  }
+  
+  return children;
+};
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -62,6 +77,16 @@ function App() {
                     <Statistics />
                   </Layout>
                 </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <Layout>
+                    <AdminPanel />
+                  </Layout>
+                </AdminRoute>
               }
             />
           </Routes>
