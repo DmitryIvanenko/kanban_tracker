@@ -88,6 +88,7 @@ class Card(Base):
     __tablename__ = "cards"
 
     id = Column(Integer, primary_key=True, index=True)
+    ticket_number = Column(String(20), unique=True, nullable=False, index=True, comment="Уникальный номер тикета в формате CMD-0000001")
     title = Column(String, nullable=False)
     description = Column(String)
     position = Column(Integer)

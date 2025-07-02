@@ -426,8 +426,22 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
                 logger.error(f"Неизвестный РЦ ЗМ: {card.rc_zm}")
                 raise HTTPException(status_code=422, detail=f"Неизвестный РЦ ЗМ: {card.rc_zm}")
 
+        # Генерируем следующий номер тикета
+        last_ticket = db.query(models.Card).order_by(models.Card.id.desc()).first()
+        if last_ticket and last_ticket.ticket_number:
+            # Извлекаем номер из последнего тикета (например, CMD-0000001 -> 1)
+            last_number = int(last_ticket.ticket_number.split('-')[1])
+            new_number = last_number + 1
+        else:
+            # Если нет тикетов или номера, начинаем с 1
+            new_number = 1
+        
+        ticket_number = f"CMD-{new_number:07d}"
+        logger.info(f"Генерирован номер тикета: {ticket_number}")
+
         # Создаем новую карточку
         db_card = models.Card(
+            ticket_number=ticket_number,
             title=card.title,
             description=card.description,
             position=card.position,
@@ -492,6 +506,7 @@ async def create_card(card: schemas.CardCreate, db: Session = Depends(get_db), c
         # Формируем ответ
         response_data = {
             "id": db_card.id,
+            "ticket_number": db_card.ticket_number,
             "title": db_card.title,
             "description": db_card.description,
             "position": db_card.position,
@@ -867,6 +882,7 @@ async def update_card(
         # Формируем ответ
         response_data = {
             "id": db_card.id,
+            "ticket_number": db_card.ticket_number,
             "title": db_card.title,
             "description": db_card.description,
             "position": db_card.position,
@@ -965,6 +981,7 @@ async def get_card(card_id: int, db: Session = Depends(get_db)):
         # Формируем ответ
         response_data = {
             "id": card.id,
+            "ticket_number": card.ticket_number,
             "title": card.title,
             "description": card.description,
             "position": card.position,

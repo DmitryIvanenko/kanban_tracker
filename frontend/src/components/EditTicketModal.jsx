@@ -288,6 +288,22 @@ const EditTicketModal = ({ open, onClose, onSuccess, ticket }) => {
         {/* Форма с основной информацией о тикете */}
         <form onSubmit={handleSubmit}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Номер тикета - неизменяемое поле */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: 'grey.50', 
+              borderRadius: 1, 
+              border: '1px solid',
+              borderColor: 'grey.300'
+            }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Номер тикета
+              </Typography>
+              <Typography variant="h6" fontWeight="bold" color="primary">
+                {ticket?.ticket_number || `CMD-${String(ticket?.id || 0).padStart(7, '0')}`}
+              </Typography>
+            </Box>
+            
             <TextField
               label="Название"
               fullWidth

@@ -229,6 +229,7 @@ class CardUpdate(BaseModel):
 
 class Card(CardBase):
     id: int
+    ticket_number: str
     created_at: datetime
     updated_at: datetime
     assignee: Optional[User] = None
