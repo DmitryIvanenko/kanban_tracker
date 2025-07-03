@@ -1,5 +1,11 @@
 # Этап сборки
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
+
+# Обновляем CA сертификаты и репозитории
+RUN apk update && \
+    apk upgrade --available && \
+    apk add --no-cache ca-certificates && \
+    update-ca-certificates
 
 # Устанавливаем дополнительные пакеты для сборки
 RUN apk add --no-cache python3 make g++
