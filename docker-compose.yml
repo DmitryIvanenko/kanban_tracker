@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:15
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=kanban
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kanban
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -15,22 +15,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/kanban
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - ADMIN_TELEGRAM=${ADMIN_TELEGRAM:-@admin}
-      - DEBUG=${DEBUG:-false}
-      - ENV=${ENV:-development}
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/kanban
+      SECRET_KEY: ${SECRET_KEY:-EB28A8906EDB01BAC142EA671A125404FAA4D4599D81123BDF56B32C640718AB}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-SecureAdmin123}
+      ADMIN_TELEGRAM: ${ADMIN_TELEGRAM:-@admin}
+      DEBUG: ${DEBUG:-true}
+      ENV: ${ENV:-development}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
@@ -40,9 +48,17 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:80"
     depends_on:
@@ -50,6 +66,12 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
 volumes:
   postgres_data:

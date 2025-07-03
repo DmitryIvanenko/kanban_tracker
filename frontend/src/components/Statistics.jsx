@@ -15,7 +15,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  TextField
+  TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import { getUsers, getStatistics } from '../services/api';
 
@@ -26,7 +32,8 @@ const Statistics = () => {
     total_tickets: 0,
     tickets_by_column: {},
     tickets_by_assignee: {},
-    average_story_points: 0
+    average_story_points: 0,
+    average_stage_times: {}
   });
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -211,6 +218,55 @@ const Statistics = () => {
                   </React.Fragment>
                 ))}
               </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Среднее время тикета в стадиях */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Среднее время тикета в стадиях
+              </Typography>
+              <TableContainer component={Paper} sx={{ boxShadow: 0 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Стадия</strong></TableCell>
+                      <TableCell align="center"><strong>Среднее время (часы)</strong></TableCell>
+                      <TableCell align="center"><strong>Среднее время (дни)</strong></TableCell>
+                      <TableCell align="center"><strong>Количество тикетов</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(stats.average_stage_times || {}).map(([stage, data]) => (
+                      <TableRow key={stage} hover>
+                        <TableCell component="th" scope="row">
+                          <Typography variant="body1" fontWeight="medium">
+                            {stage}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            {data.average_hours || 0}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            {data.average_days || 0}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography variant="body2" color="text.secondary">
+                            {data.tickets_count || 0}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </CardContent>
           </Card>
         </Grid>

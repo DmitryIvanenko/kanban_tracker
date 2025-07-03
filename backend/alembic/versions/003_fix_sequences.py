@@ -23,54 +23,64 @@ def upgrade():
     # Получаем максимальные ID и обновляем последовательности
     connection = op.get_bind()
     
-    # Для таблицы users
+    # Для таблицы users (минимум 1, если таблица пустая)
     result = connection.execute(sa.text("SELECT MAX(id) FROM users"))
     max_user_id = result.scalar() or 0
-    connection.execute(sa.text(f"SELECT setval('users_id_seq', {max_user_id}, true)"))
+    seq_value = max(max_user_id, 1)
+    connection.execute(sa.text(f"SELECT setval('users_id_seq', {seq_value}, true)"))
     
     # Для таблицы boards  
     result = connection.execute(sa.text("SELECT MAX(id) FROM boards"))
     max_board_id = result.scalar() or 0
-    connection.execute(sa.text(f"SELECT setval('boards_id_seq', {max_board_id}, true)"))
+    seq_value = max(max_board_id, 1)
+    connection.execute(sa.text(f"SELECT setval('boards_id_seq', {seq_value}, true)"))
     
     # Для таблицы columns
     result = connection.execute(sa.text("SELECT MAX(id) FROM columns"))
     max_column_id = result.scalar() or 0
-    connection.execute(sa.text(f"SELECT setval('columns_id_seq', {max_column_id}, true)"))
+    seq_value = max(max_column_id, 1)
+    connection.execute(sa.text(f"SELECT setval('columns_id_seq', {seq_value}, true)"))
     
-    # Для таблицы tags
-    result = connection.execute(sa.text("SELECT MAX(id) FROM tags"))
-    max_tag_id = result.scalar() or 0
-    if max_tag_id > 0:
-        connection.execute(sa.text(f"SELECT setval('tags_id_seq', {max_tag_id}, true)"))
+    # Для остальных таблиц проверяем их существование и данные
+    tables_sequences = [
+        ('tags', 'tags_id_seq'),
+        ('cards', 'cards_id_seq'),
+        ('card_history', 'card_history_id_seq'),
+        ('comments', 'comments_id_seq')
+    ]
     
-    # Для таблицы cards
-    result = connection.execute(sa.text("SELECT MAX(id) FROM cards"))
-    max_card_id = result.scalar() or 0
-    if max_card_id > 0:
-        connection.execute(sa.text(f"SELECT setval('cards_id_seq', {max_card_id}, true)"))
-    
-    # Для таблицы card_history
-    result = connection.execute(sa.text("SELECT MAX(id) FROM card_history"))
-    max_history_id = result.scalar() or 0
-    if max_history_id > 0:
-        connection.execute(sa.text(f"SELECT setval('card_history_id_seq', {max_history_id}, true)"))
-    
-    # Для таблицы comments
-    result = connection.execute(sa.text("SELECT MAX(id) FROM comments"))
-    max_comment_id = result.scalar() or 0
-    if max_comment_id > 0:
-        connection.execute(sa.text(f"SELECT setval('comments_id_seq', {max_comment_id}, true)"))
+    for table_name, seq_name in tables_sequences:
+        # Проверяем существование таблицы
+        table_exists = connection.execute(sa.text(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = :table_name)"
+        ), {"table_name": table_name}).scalar()
+        
+        if table_exists:
+            result = connection.execute(sa.text(f"SELECT MAX(id) FROM {table_name}"))
+            max_id = result.scalar() or 0
+            seq_value = max(max_id, 1)
+            connection.execute(sa.text(f"SELECT setval('{seq_name}', {seq_value}, true)"))
 
 
 def downgrade():
     # Возвращаем последовательности в начальное состояние
     connection = op.get_bind()
     
-    connection.execute(sa.text("SELECT setval('users_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('boards_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('columns_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('tags_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('cards_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('card_history_id_seq', 1, false)"))
-    connection.execute(sa.text("SELECT setval('comments_id_seq', 1, false)")) 
+    sequences = [
+        'users_id_seq',
+        'boards_id_seq', 
+        'columns_id_seq',
+        'tags_id_seq',
+        'cards_id_seq',
+        'card_history_id_seq',
+        'comments_id_seq'
+    ]
+    
+    for seq_name in sequences:
+        # Проверяем существование sequence перед сбросом
+        seq_exists = connection.execute(sa.text(
+            "SELECT EXISTS (SELECT FROM pg_sequences WHERE sequencename = :seq_name)"
+        ), {"seq_name": seq_name}).scalar()
+        
+        if seq_exists:
+            connection.execute(sa.text(f"SELECT setval('{seq_name}', 1, false)")) 

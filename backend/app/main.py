@@ -640,6 +640,129 @@ async def get_rc_types():
         ]
     }
 
+def calculate_stage_time_statistics(db: Session, cards: List[models.Card]) -> dict:
+    """
+    Рассчитывает среднее время тикетов в каждой стадии на основе истории перемещений
+    """
+    from datetime import datetime, timezone
+    
+    # Получаем информацию о колонках для сопоставления названий со стадиями
+    columns = db.query(models.KanbanColumn).order_by(models.KanbanColumn.position).all()
+    column_to_stage = {}
+    
+    # Маппинг колонок к стадиям по позиции
+    for i, column in enumerate(columns):
+        if i == 0:
+            column_to_stage[column.id] = "Бэклог"
+        elif i == 1: 
+            column_to_stage[column.id] = "В работе"
+        elif i == 2:
+            column_to_stage[column.id] = "На согласовании"
+    
+    # Словарь для накопления временных интервалов по стадиям
+    stage_durations = {
+        "Бэклог": [],
+        "В работе": [],
+        "На согласовании": []
+    }
+    for card in cards:
+        # Получаем всю историю карточки
+        history = db.query(models.CardHistory)\
+            .filter(models.CardHistory.card_id == card.id)\
+            .order_by(models.CardHistory.created_at)\
+            .all()
+        
+        if not history:
+            continue
+            
+        # Начальное состояние: карточка создана в первой колонке, которая встречается в истории
+        creation_time = card.created_at
+        current_column_id = None
+        stage_start_time = creation_time
+        
+        # Находим первую колонку из истории создания или перемещения
+        for entry in history:
+            if entry.action == "created":
+                # Парсим JSON для получения column_id из деталей создания
+                import json
+                try:
+                    details = json.loads(entry.details)
+                    current_column_id = details.get("column_id")
+                    stage_start_time = entry.created_at
+                    break
+                except:
+                    pass
+            elif entry.action == "move" and "из колонки" in entry.details:
+                # Берем исходную колонку из первого перемещения
+                try:
+                    parts = entry.details.split()
+                    current_column_id = int(parts[3])  # "из колонки X"
+                    break
+                except:
+                    pass
+        
+        # Если не нашли колонку в истории, берем текущую колонку карточки
+        if current_column_id is None:
+            current_column_id = card.column_id
+            
+        current_stage = column_to_stage.get(current_column_id)
+        
+        # Обрабатываем все перемещения
+        for entry in history:
+            if entry.action == "move" and "в колонку" in entry.details:
+                try:
+                    parts = entry.details.split()
+                    from_column_id = int(parts[3])
+                    to_column_id = int(parts[6])
+                    
+                    # Завершаем текущую стадию и записываем время
+                    if current_stage and stage_start_time:
+                        duration = entry.created_at - stage_start_time
+                        hours = duration.total_seconds() / 3600
+                        if hours > 0:
+                            stage_durations[current_stage].append(hours)
+                    
+                    # Переходим в новую стадию
+                    current_column_id = to_column_id
+                    current_stage = column_to_stage.get(to_column_id)
+                    stage_start_time = entry.created_at
+                    
+                except (IndexError, ValueError, TypeError):
+                    continue
+        
+        # Добавляем время в текущей стадии (время с последнего перемещения до сейчас)
+        if current_stage and stage_start_time:
+            # Определяем текущее время в том же формате что и в базе
+            if stage_start_time.tzinfo is None:
+                current_time = datetime.utcnow()
+            else:
+                current_time = datetime.now(timezone.utc)
+                
+            current_duration = current_time - stage_start_time
+            current_hours = current_duration.total_seconds() / 3600
+            if current_hours > 0:
+                stage_durations[current_stage].append(current_hours)
+    
+    # Вычисляем статистику
+    result = {}
+    for stage_name in ["Бэклог", "В работе", "На согласовании"]:
+        times = stage_durations[stage_name]
+        if times:
+            avg_hours = sum(times) / len(times)
+            result[stage_name] = {
+                "average_hours": round(avg_hours, 2),
+                "average_days": round(avg_hours / 24, 2),
+                "tickets_count": len(times)
+            }
+        else:
+            result[stage_name] = {
+                "average_hours": 0,
+                "average_days": 0,
+                "tickets_count": 0
+            }
+    
+    return result
+
 @app.get("/api/statistics")
 async def get_statistics(
     assignee_id: Optional[int] = None,
@@ -682,11 +805,15 @@ async def get_statistics(
                 assignee_name = card.assignee.username
                 tickets_by_assignee[assignee_name] = tickets_by_assignee.get(assignee_name, 0) + 1
         
+        # Расчет среднего времени в стадиях
+        stage_time_stats = calculate_stage_time_statistics(db, cards)
+        
         return {
             "total_tickets": total_tickets,
             "tickets_by_column": tickets_by_column,
             "tickets_by_assignee": tickets_by_assignee,
-            "average_story_points": average_story_points
+            "average_story_points": average_story_points,
+            "average_stage_times": stage_time_stats
         }
     except Exception as e:
         logger.error(f"Ошибка при получении статистики: {str(e)}")
