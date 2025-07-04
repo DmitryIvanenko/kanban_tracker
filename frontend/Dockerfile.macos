@@ -1,15 +1,16 @@
+# Специальный Dockerfile для macOS с обходом SSL проблем
 # Этап сборки
 FROM node:20-alpine AS build
 
-# Решение проблемы с SSL на macOS - устанавливаем certificates и используем fallback
-RUN apk add --no-cache ca-certificates wget && \
-    update-ca-certificates && \
-    (apk update --no-cache || apk --allow-untrusted --no-cache update) && \
-    (apk upgrade --available --no-cache || apk --allow-untrusted --no-cache upgrade --available) || true
+# Полный обход SSL проблем на macOS
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/community" >> /etc/apk/repositories && \
+    apk update --allow-untrusted && \
+    apk add --no-cache --allow-untrusted ca-certificates wget curl && \
+    update-ca-certificates
 
 # Устанавливаем дополнительные пакеты для сборки
-RUN apk add --no-cache python3 make g++ || \
-    apk --allow-untrusted --no-cache add python3 make g++
+RUN apk add --no-cache --allow-untrusted python3 make g++
 
 WORKDIR /app
 
@@ -17,13 +18,15 @@ WORKDIR /app
 RUN npm config set fetch-timeout 600000 && \
     npm config set fetch-retry-mintimeout 10000 && \
     npm config set fetch-retry-maxtimeout 60000 && \
-    npm config set fetch-retries 3
+    npm config set fetch-retries 3 && \
+    npm config set registry https://registry.npmjs.org/ && \
+    npm config set strict-ssl false
 
 # Копируем файлы package.json и package-lock.json для кеширования слоя зависимостей
 COPY package*.json ./
 
 # Устанавливаем зависимости с расширенными таймаутами
-RUN npm install --timeout=600000
+RUN npm install --timeout=600000 --no-audit --no-fund
 
 # Копируем исходный код
 COPY . .
