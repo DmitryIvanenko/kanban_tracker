@@ -201,6 +201,7 @@ kanban-tracker/
 │   │   └── database.py
 │   ├── alembic/
 │   ├── Dockerfile
+│   ├── Dockerfile.macos
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/

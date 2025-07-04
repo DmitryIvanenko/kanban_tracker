@@ -1,0 +1,26 @@
+# Специальный Dockerfile для backend на macOS с обходом SSL проблем
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Настраиваем pip для обхода SSL проблем на macOS
+RUN pip config set global.trusted-host pypi.org && \
+    pip config set global.trusted-host pypi.python.org && \
+    pip config set global.trusted-host files.pythonhosted.org && \
+    pip config set global.cert /etc/ssl/certs/ca-certificates.crt
+
+# Обновляем pip до последней версии с обходом SSL
+RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --upgrade pip
+
+# Копируем requirements.txt для кеширования слоя зависимостей
+COPY requirements.txt .
+
+# Устанавливаем зависимости с обходом SSL
+RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r requirements.txt
+
+# Копируем исходный код
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
